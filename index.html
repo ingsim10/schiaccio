@@ -109,6 +109,12 @@
   .fascia-sub{color:var(--muted); font-size:14px; margin:0 0 20px;}
   .badge-calib{background:var(--surface-2); border:1px solid var(--line); border-radius:14px; padding:14px 16px; font-size:13px; color:var(--muted); line-height:1.5; text-align:left;}
   .note-review{margin-top:14px; background:color-mix(in srgb, var(--warn) 14%, var(--surface)); border:1px solid var(--warn); border-radius:12px; padding:12px 14px; font-size:12.5px; color:var(--ink); text-align:left; line-height:1.5;}
+  .next-box{margin-top:14px; background:var(--blue-bg); border:1px solid color-mix(in srgb, var(--blue) 30%, var(--line)); border-radius:14px; padding:14px 16px; text-align:left;}
+  .next-box h2{font-size:14px; margin:0 0 6px;}
+  .next-box p{margin:0 0 8px; font-size:13px; color:var(--muted); line-height:1.5;}
+  .next-box p:last-child{margin-bottom:0;}
+  .bottombar.col{flex-direction:column; gap:8px;}
+  .share-hint{margin:0; font-size:12px; color:var(--muted); text-align:center; line-height:1.4;}
 
   .field-hint{font-size:12px; color:var(--muted); margin-top:6px; line-height:1.4;}
   .error-box{background:color-mix(in srgb, var(--coral) 12%, var(--surface)); border:1px solid var(--coral); color:var(--coral-ink); border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:16px;}
@@ -208,10 +214,16 @@
           <div class="note-review" id="verdReview" style="display:none;">
             ⚠️ Le tue risposte sono un po' contraddittorie tra loro — un compagno di Simone ricontrollerà a mano il tuo livello di partenza prima della prima partita.
           </div>
+          <div class="next-box">
+            <h2>E adesso?</h2>
+            <p>Sei nell'elenco. Le partite le organizza Simone a mano: ti scrive su WhatsApp, al numero che hai lasciato, quando c'è un 2 contro 2 della tua fascia.</p>
+            <p>Perché una partita parta servono quattro giocatori dello stesso livello. In due non si gioca.</p>
+          </div>
         </div>
       </div>
-      <div class="bottombar">
-        <button class="btn btn-primary" disabled>Trova partita — in arrivo</button>
+      <div class="bottombar col">
+        <button class="btn btn-primary" id="btnCondividi">Passa il link a chi gioca</button>
+        <p class="share-hint" id="shareHint">Più siete, prima parte una partita della tua fascia.</p>
       </div>
     </section>
 
@@ -493,6 +505,23 @@ function mostraVerdetto(data){
   document.getElementById("verdSub").textContent = v.fasciaSottotitolo || "—";
   document.getElementById("verdReview").style.display = v.guardiaAttiva ? "block" : "none";
 }
+// ---------- CONDIVIDI IL LINK ----------
+document.getElementById("btnCondividi").addEventListener("click", async () => {
+  const url = location.origin + location.pathname;
+  const hint = document.getElementById("shareHint");
+  const testo = "Qui ci organizziamo le partite di beach 2 contro 2: rispondi a 6 domande e sei nell'elenco.";
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: "SCHIACCIO", text: testo, url });
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    hint.textContent = "Link copiato — incollalo dove vuoi.";
+  } catch (e) {
+    if (e && e.name === "AbortError") return;   // ha annullato: non e' un errore
+    hint.textContent = url;
+  }
+});
 </script>
 </body>
 </html>
