@@ -1,6 +1,15 @@
-// Funzione di conversione: risposte alle 6 domande → livello (1.0-7.0) + margine
-// Specifica: ../funzione-conversione.md — ⚠️ costanti segnaposto, da tarare col pilota
+// Funzione di conversione: risposte del questionario → livello (1.0-7.0) + margine
+// Specifica: ../funzione-conversione.md — ⚠️ i numeri sono ancora da tarare
 // Regola: Claude tiene la struttura, Simone valida i numeri (giudizi di beach)
+//
+// Tre strade, decise dalla prima domanda:
+//   C  federali (AIBVC L2/L1, FIPAV) → la categoria dice la fascia
+//   A  tornei della scuola           → il tabellone dice la fascia
+//   B  niente tornei                 → matrice anni sulla sabbia × indoor
+//
+// La rifinitura cambia bersaglio col livello (29/08, osservazione di Simone):
+// i segnali dietro la schiena distinguono chi gioca da poco ma nel gold li
+// fanno tutti; in alto distingue la battuta in salto; in mezzo il piazzamento.
 
 export const FASCE = [
   { min: 1.0, max: 1.8, nome: "Principiante", sub: "prime volte sulla sabbia" },
@@ -18,51 +27,59 @@ export function getFascia(valore) {
   return f || FASCE[FASCE.length - 1];
 }
 
-const BASE_STRADA_C = { AIBVC_L2: 5.8, AIBVC_L1: 6.2, FIPAV: 6.6 };
+const BASE_FEDERALE = { AIBVC_L2: 5.8, AIBVC_L1: 6.2, FIPAV: 6.6 };
+const BASE_TABELLONE = { bronze: 2.6, silver: 3.6, gold: 4.8 };
 
-const BASE_STRADA_A = {
-  vince_raramente_bronze: 2.4,
-  vince_bronze_perde_silver: 3.0,
-  silver_se_la_gioca: 3.6,
-  vince_silver_perde_gold: 4.4,
-  gold_se_la_gioca: 5.0,
-};
-
-const MATRICE_STRADA_B = {
+const MATRICE_SENZA_TORNEI = {
   mai: { mai: 1.2, amatoriale: 1.6, serieDC: 2.8, serieBplus: 3.4 },
   da1a3: { mai: 1.9, amatoriale: 2.2, serieDC: 3.0, serieBplus: 3.6 },
   piuDi3: { mai: 2.2, amatoriale: 2.5, serieDC: 3.2, serieBplus: 3.8 },
 };
 
-// 29/08: la domanda sull'alzata e' stata tolta. Era la seconda leva piu'
-// pesante del questionario (cambiava fascia in 7-9 casi su 10) ma chiedeva un
-// giudizio che l'amatore non puo' dare: nelle partite tra amici non c'e'
-// nessun arbitro che fischia i doppi, quindi meta' delle risposte era
-// inventata. Una risposta inventata che sposta di una fascia intera vale meno
-// di una domanda in meno.
-const Q4_RIFINITURA = { mai: -0.1, ogni_tanto: 0.1, sempre_codice: 0.3 };
+// Dove arriva DI SOLITO: pesa. Il MIGLIORE piazzamento: solo un incremento —
+// così chi in silver ci è arrivato una domenica per caso non viene contato
+// come chi ci sta stabilmente (indicazione di Simone, 29/08).
+const RIF_SPESSO = { gironi: -0.40, quarti: -0.15, semifinale: 0.15, finale: 0.40 };
+const RIF_MIGLIORE = { gironi: -0.05, quarti: 0, semifinale: 0.10, finale: 0.20 };
+const RIF_BATTUTA = { mai: -0.25, provo: -0.10, forte: 0.10, disinvolto: 0.25 };
+const RIF_SEGNALI = { mai: -0.1, ogni_tanto: 0.1, sempre_codice: 0.3 };
 
-// r = { q1, q2, q4, q5, q6, compagni }
+const ORDINE_PIAZZAMENTO = { gironi: 0, quarti: 1, semifinale: 2, finale: 3 };
+const TETTO_RIFINITURA = 0.70;
+
+// r = { q5, q7, q8, q9, q10, q1, q2, q4, compagni }
 export function computaLivello(r) {
-  let strada, base, margineMin, margineMax;
+  let strada, base, margineMin, margineMax, rifinitura, guardiaAttiva = false;
 
-  if (r.q5 in BASE_STRADA_C) {
+  if (r.q5 in BASE_FEDERALE) {
     strada = "C";
-    base = BASE_STRADA_C[r.q5];
+    base = BASE_FEDERALE[r.q5];
     margineMin = margineMax = 0.5;
-  } else if (r.q6 !== "non_faccio_tornei") {
+    rifinitura = (RIF_SPESSO[r.q8] || 0) + (RIF_MIGLIORE[r.q9] || 0) + (RIF_BATTUTA[r.q10] || 0);
+
+  } else if (r.q5 === "scuola") {
     strada = "A";
-    base = BASE_STRADA_A[r.q6];
+    base = BASE_TABELLONE[r.q7];
     margineMin = margineMax = 0.6;
+    // la battuta in salto si chiede solo nel gold: sotto non separa nessuno
+    rifinitura = (RIF_SPESSO[r.q8] || 0) + (RIF_MIGLIORE[r.q9] || 0) +
+                 (r.q7 === "gold" ? (RIF_BATTUTA[r.q10] || 0) : 0);
+    if (base === undefined) { base = 3.2; guardiaAttiva = true; }
+
   } else {
     strada = "B";
-    // rete di sicurezza: la strada B ha bisogno di q1 e q2, che il questionario
-    // chiede solo a chi dice di non fare tornei. Se mancano (dato importato,
-    // percorso cambiato a meta') non si tira a indovinare: valore centrale e
-    // profilo segnato per la revisione di Simone.
-    const riga = MATRICE_STRADA_B[r.q1];
-    base = riga && riga[r.q2] !== undefined ? riga[r.q2] : 2.2;
+    // rete di sicurezza: la strada B ha bisogno di q1 e q2. Se mancano (dato
+    // importato, percorso cambiato a metà) non si tira a indovinare: valore
+    // centrale e profilo segnato per la revisione di Simone.
+    const riga = MATRICE_SENZA_TORNEI[r.q1];
+    if (riga && riga[r.q2] !== undefined) {
+      base = riga[r.q2];
+    } else {
+      base = 2.2;
+      guardiaAttiva = true;
+    }
     margineMin = margineMax = 0.8;
+    rifinitura = RIF_SEGNALI[r.q4] || 0;
     // ex-indoor in rodaggio (13/08): margine asimmetrico, quasi impossibile
     // sia sotto, molto probabile sia sopra → si apre verso l'alto
     const exIndoorRodaggio =
@@ -73,26 +90,22 @@ export function computaLivello(r) {
     }
   }
 
-  const rawRifinitura = Q4_RIFINITURA[r.q4] || 0;
-  let rifinitura = strada === "C" ? rawRifinitura / 2 : rawRifinitura;
-  rifinitura = Math.max(-0.4, Math.min(0.4, rifinitura));
+  rifinitura = Math.max(-TETTO_RIFINITURA, Math.min(TETTO_RIFINITURA, rifinitura));
 
-  // Guardia di coerenza: la strada dice "forte" ma la rifinitura tecnica dice
-  // "debole" (o viceversa) → non si sceglie, si allarga il margine e si segna
-  // per la revisione di Simone. Euristica di primo passo, da raffinare.
-  let guardiaAttiva = false;
-  if (!(MATRICE_STRADA_B[r.q1] || {})[r.q2] && strada === "B") guardiaAttiva = true;
-  // gioca tornei a buon livello ma a rete non fa mai segnali: una delle due
-  // risposte non torna
-  if (strada !== "B" && base >= 3.6 && r.q4 === "mai") guardiaAttiva = true;
+  // --- guardie di coerenza: non si sceglie chi ha ragione, si segna il profilo
+  // e lo guarda Simone. Il margine intanto resta largo. ---
+
+  // il miglior piazzamento non può essere peggiore di quello abituale
+  if (r.q8 && r.q9 && ORDINE_PIAZZAMENTO[r.q9] < ORDINE_PIAZZAMENTO[r.q8]) guardiaAttiva = true;
+  // gioca gold o federale ma non prova nemmeno la battuta in salto: una delle
+  // due risposte non torna (a quel livello la saltano tutti)
+  if ((strada === "C" || (strada === "A" && r.q7 === "gold")) && r.q10 === "mai") guardiaAttiva = true;
   // dice di non fare tornei e di giocare poco, ma ha un codice di segnali fisso
   if (strada === "B" && base <= 2.0 && r.q4 === "sempre_codice") guardiaAttiva = true;
-  // rete di sicurezza: dice di fare i tornei della scuola ma non dice dove
-  // smette di vincere. Nel questionario non è più possibile, ma un dato
-  // vecchio o importato finirebbe valutato come chi non gioca tornei.
-  if (r.q5 === "scuola" && (!r.q6 || r.q6 === "non_faccio_tornei")) guardiaAttiva = true;
+
   if (guardiaAttiva) {
-    margineMin = margineMax = 0.8;
+    margineMin = Math.max(margineMin, 0.8);
+    margineMax = Math.max(margineMax, 0.8);
   }
 
   let valore = base + rifinitura;

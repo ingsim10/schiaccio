@@ -52,7 +52,6 @@
     border:1px solid var(--line); border-radius:16px; padding:16px;
   }
   .esito .riga{display:flex; justify-content:space-between; gap:12px; font-size:13px; padding:4px 0;}
-  .esito .riga b{font-weight:800;}
   .grande{font-size:26px; font-weight:900; margin:0 0 2px;}
   .valore{font-size:13px; color:var(--muted); margin:0 0 10px;}
   .pill{display:inline-block; background:var(--blue-bg); color:var(--blue); border-radius:999px;
@@ -63,6 +62,7 @@
   .punto{position:absolute; top:-3px; width:4px; height:18px; border-radius:2px; background:var(--coral);}
   .scala{display:flex; justify-content:space-between; font-size:10.5px; color:var(--muted);}
 
+  .filtri{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px;}
   table{width:100%; border-collapse:collapse; font-size:12.5px;}
   th,td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top;}
   th{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:800;}
@@ -90,26 +90,21 @@
   </div>
 
   <div class="vista" id="vista-tabella">
-    <div class="avviso">Ogni riga è un giocatore possibile: tutte le combinazioni di risposte che il questionario può produrre, ordinate dal più debole al più forte. Se una riga ti sembra sbagliata, il numero da correggere sta in <b>conversione.js</b>.</div>
+    <div class="avviso">Ogni riga è un giocatore possibile: tutte le combinazioni che il questionario può produrre, ordinate dal più debole al più forte. Se una riga ti sembra sbagliata, il numero da correggere sta in <b>conversione.js</b>. Le righe con ⚠️ sono risposte che si contraddicono (per esempio: miglior piazzamento peggiore di quello abituale): l'app le accetta ma segna il profilo perché lo guardi tu.</div>
+    <div class="filtri" id="filtri"></div>
     <div class="tabella-scroll"><table id="tabella"></table></div>
   </div>
 </div>
 
 <script type="module">
-import { computaLivello, FASCE, getFascia } from "./conversione.js";
-import { DOMANDE, domandeAttive, allineaRisposte } from "./domande.js";
+import { computaLivello, FASCE } from "./conversione.js";
+import { DOMANDE, domandeAttive, allineaRisposte, ETICHETTE } from "./domande.js";
 
 const MIN_SCALA = 1.0, MAX_SCALA = 7.0;
+const NOME_STRADA = { C: "federali", A: "tornei della scuola", B: "niente tornei" };
 
-// etichette leggibili per ogni risposta, prese dalle domande stesse
-const ETICHETTE = {};
-DOMANDE.forEach((d) => {
-  if (!d.opzioni) return;
-  ETICHETTE[d.key] = {};
-  d.opzioni.forEach(([val, label]) => { ETICHETTE[d.key][val] = label; });
-});
-
-// ---------- quali partite può giocare, con la regola vera del cancello ----------
+// Quali partite potrebbe giocare: stessa identica regola del cancello dell'app
+// (si confrontano intervalli, non numeri).
 function fasceRaggiungibili(v){
   const lo = v.valore - v.margineMin, hi = v.valore + v.margineMax;
   return FASCE.filter((f) => hi >= f.min && lo <= f.max).map((f) => f.nome);
@@ -134,7 +129,7 @@ function renderDomande(){
         (viva ? "" : " disabled") + ">" + label + "</button>";
     });
     html += "</div>";
-    if (!viva) html += '<p class="nota">Non compare a chi ha risposto così alla prima domanda: nel suo caso non sposta il livello.</p>';
+    if (!viva) html += '<p class="nota">Non compare a chi ha risposto così alle domande prima: nel suo caso non sposta il livello.</p>';
     box.innerHTML = html;
     cont.appendChild(box);
   });
@@ -180,43 +175,62 @@ function renderEsito(){
     '<div class="riga"><span>Può giocare le partite di fascia</span><b style="text-align:right">' +
       fasceRaggiungibili(v).join(", ") + '</b></div>' +
     '<div style="margin-top:10px">' +
-      '<span class="pill">strada ' + v.strada + '</span>' +
+      '<span class="pill">' + NOME_STRADA[v.strada] + '</span>' +
       (v.guardiaAttiva ? '<span class="pill allarme">⚠️ da ricontrollare a mano</span>' : '') +
     '</div>';
 }
 
 // ---------- tutti i casi possibili ----------
+// Generati percorrendo le domande vere, non un elenco scritto a mano: se le
+// domande cambiano, la tabella si aggiorna da sola.
 function tutteLeCombinazioni(){
-  const Q1 = ["mai", "da1a3", "piuDi3"];
-  const Q2 = ["mai", "amatoriale", "serieDC", "serieBplus"];
-  const Q4 = ["mai", "ogni_tanto", "sempre_codice"];
-  const Q6 = ["vince_raramente_bronze", "vince_bronze_perde_silver", "silver_se_la_gioca",
-              "vince_silver_perde_gold", "gold_se_la_gioca"];
   const out = [];
-
-  ["AIBVC_L2", "AIBVC_L1", "FIPAV"].forEach((q5) => out.push({ q5 }));
-  Q6.forEach((q6) => Q4.forEach((q4) => out.push({ q5: "scuola", q6, q4 })));
-  Q1.forEach((q1) => Q2.forEach((q2) => Q4.forEach((q4) =>
-    out.push({ q5: "non_faccio_tornei", q6: "non_faccio_tornei", q1, q2, q4 }))));
-
+  (function espandi(parziali){
+    const attive = domandeAttive(parziali).filter((d) => !d.libera);
+    const prossima = attive.find((d) => !(d.key in parziali));
+    if (!prossima){ out.push(parziali); return; }
+    prossima.opzioni.forEach(([val]) => {
+      const copia = { ...parziali, [prossima.key]: val };
+      if (prossima.key === "q5") allineaRisposte(copia, val);
+      espandi(copia);
+    });
+  })({});
   return out;
 }
 
 function descrivi(r){
-  const parti = [];
-  ["q5", "q6", "q1", "q2", "q4"].forEach((k) => {
-    if (!r[k]) return;
-    if (k === "q6" && r.q6 === "non_faccio_tornei") return;
-    parti.push(ETICHETTE[k][r[k]]);
+  return DOMANDE.filter((d) => d.opzioni && r[d.key])
+    .map((d) => ETICHETTE[d.key][r[d.key]])
+    .join(" · ");
+}
+
+let filtroStrada = "tutte";
+let soloCoerenti = false;   // la tabella contiene anche risposte impossibili (miglior piazzamento peggiore di quello abituale)
+const CASI = tutteLeCombinazioni().map((r) => ({ r, v: computaLivello(r) }))
+  .sort((a, b) => a.v.valore - b.v.valore);
+
+function renderFiltri(){
+  const conta = (s) => CASI.filter((c) => (s === "tutte" || c.v.strada === s) && (!soloCoerenti || !c.v.guardiaAttiva)).length;
+  const segnati = CASI.filter((c) => c.v.guardiaAttiva).length;
+  document.getElementById("filtri").innerHTML =
+    [["tutte", "Tutti"], ["C", "Federali"], ["A", "Tornei della scuola"], ["B", "Niente tornei"]]
+      .map(([k, label]) =>
+        '<button class="chip' + (filtroStrada === k ? " on" : "") + '" data-filtro="' + k + '">' +
+        label + " (" + conta(k) + ")</button>").join("") +
+    '<button class="chip' + (soloCoerenti ? " on" : "") + '" data-coerenti="1">' +
+    (soloCoerenti ? "Mostra anche le risposte impossibili" : "Nascondi le risposte impossibili (" + segnati + ")") +
+    "</button>";
+  document.querySelectorAll("[data-filtro]").forEach((b) => {
+    b.addEventListener("click", () => { filtroStrada = b.dataset.filtro; renderFiltri(); renderTabella(); });
   });
-  return parti.join(" · ");
+  document.querySelector("[data-coerenti]").addEventListener("click", () => {
+    soloCoerenti = !soloCoerenti; renderFiltri(); renderTabella();
+  });
 }
 
 function renderTabella(){
-  const righe = tutteLeCombinazioni()
-    .map((r) => ({ r, v: computaLivello(r) }))
-    .sort((a, b) => a.v.valore - b.v.valore);
-
+  const righe = CASI.filter((c) => (filtroStrada === "tutte" || c.v.strada === filtroStrada) &&
+                                   (!soloCoerenti || !c.v.guardiaAttiva));
   let html = "<tr><th>Chi è</th><th>Livello</th><th>Fascia</th><th>Margine</th><th>Entra in</th></tr>";
   righe.forEach(({ r, v }) => {
     html += "<tr>" +
@@ -227,9 +241,8 @@ function renderTabella(){
       "<td>" + fasceRaggiungibili(v).join(", ") + "</td>" +
       "</tr>";
   });
-  html += '<tr><td colspan="5" class="nota">' + righe.length +
-    " casi possibili in tutto. Le fasce: " +
-    FASCE.map((f) => f.nome + " " + f.min.toFixed(1) + "–" + f.max.toFixed(1)).join(" · ") +
+  html += '<tr><td colspan="5" class="nota">' + righe.length + " casi mostrati su " + CASI.length +
+    ". Le fasce: " + FASCE.map((f) => f.nome + " " + f.min.toFixed(1) + "–" + f.max.toFixed(1)).join(" · ") +
     "</td></tr>";
   document.getElementById("tabella").innerHTML = html;
 }
@@ -246,6 +259,7 @@ document.querySelectorAll(".tab").forEach((t) => {
 
 renderDomande();
 renderEsito();
+renderFiltri();
 renderTabella();
 </script>
 </body>

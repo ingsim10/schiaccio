@@ -67,6 +67,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from
 import { getFirestore, collection, getDocs, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { firebaseConfig, EMAIL_ADMIN } from "./firebase-config.js";
 import { getFascia } from "./conversione.js";
+import { DOMANDE, ETICHETTE } from "./domande.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -79,22 +80,12 @@ document.getElementById("btnLogin").addEventListener("click", () => {
   });
 });
 
-const ETICHETTE = {
-  q1: { mai: "beach: mai/quest'anno", da1a3: "beach: 1-3 anni", piuDi3: "beach: 3+ anni" },
-  q2: { mai: "indoor: mai", amatoriale: "indoor: amatoriale", serieDC: "indoor: D-C", serieBplus: "indoor: B+" },
-  q3: { bagher: "alza: bagher", doppi_fischiati: "alza: mani (doppi)", mani_ok: "alza: mani ok", dipende: "alza: dipende" },
-  q4: { mai: "segnali: mai", ogni_tanto: "segnali: a volte", sempre_codice: "segnali: sempre" },
-  q5: { non_faccio_tornei: "tornei: nessuno", scuola: "tornei: scuola", AIBVC_L2: "AIBVC L2", AIBVC_L1: "AIBVC L1", FIPAV: "FIPAV" },
-  q6: { non_faccio_tornei: "vince: n/a", vince_raramente_bronze: "vince: raro nel bronze", vince_bronze_perde_silver: "vince: bronze",
-        silver_se_la_gioca: "vince: se la gioca silver", vince_silver_perde_gold: "vince: silver", gold_se_la_gioca: "vince: se la gioca gold" },
-};
 
 function fmtRisposte(r){
   if (!r) return "—";
-  const parts = [];
-  ["q1","q2","q3","q4","q5","q6"].forEach(k => {
-    if (r[k] && ETICHETTE[k] && ETICHETTE[k][r[k]]) parts.push(ETICHETTE[k][r[k]]);
-  });
+  const parts = DOMANDE
+    .filter(d => d.opzioni && r[d.key] && ETICHETTE[d.key][r[d.key]])
+    .map(d => ETICHETTE[d.key][r[d.key]]);
   let out = parts.join(" · ");
   if (r.compagni) out += '<br><span class="muted">con: ' + r.compagni + '</span>';
   return out;
