@@ -19,7 +19,7 @@ export const DOMANDE = [
       ["AIBVC_L2", "AIBVC L2"], ["AIBVC_L1", "AIBVC L1"], ["FIPAV", "FIPAV"] ] },
 
   // --- chi fa i tornei della scuola: il tabellone dice la fascia di partenza ---
-  { key: "q7", testo: "In quale tabellone giochi di solito?", opzioni: [
+  { key: "q7", testo: "In quale tabellone arrivi di solito?", opzioni: [
       ["bronze", "Bronze"], ["silver", "Silver"], ["gold", "Gold"] ] },
 
   // --- federali: la classifica AIBVC è una misura vera, batte i ricordi ---
@@ -34,8 +34,8 @@ export const DOMANDE = [
   // 3 partite di girone che ti smistano nel bronze/silver/gold, poi 3-4 partite
   // al massimo. Quindi non "quarti/semifinale" ma quante partite vinci. ---
   { key: "q8", testo: "Nel tuo tabellone, dove arrivi più spesso?", opzioni: [
-      ["esco_subito", "Esco subito"], ["una_due", "Vinco una o due partite"],
-      ["semi_finale", "Arrivo in semifinale o in finale"] ] },
+      ["esco_subito", "Eliminato subito"], ["una_due", "Un po' vado avanti"],
+      ["semi_finale", "Semifinale o finale"] ] },
   // Non chiede il miglior piazzamento in sé — un girone facile ti porta nel gold
   // per caso — ma com'è andata quando ci sei arrivato: è lì che si vede se il
   // tabellone alto era tuo o del sorteggio.
