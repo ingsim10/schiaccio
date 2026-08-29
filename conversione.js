@@ -56,7 +56,10 @@ const RIF_SPESSO = { esco_subito: -0.35, una_due: 0, semi_finale: 0.35 };
 // girone facile ci finisci per sorteggio. La domanda serve soprattutto a dare
 // uno sfogo onesto a chi ci è arrivato — così non ha bisogno di gonfiare le
 // altre risposte per farlo sapere (parole di Simone: "senza mentire").
-const RIF_TABELLONE_ALTO = { mai: 0, male: 0.05, vicino: 0.10, vinto: 0.15 };
+// 29/08, Simone: esserci arrivato e averle prese non è un merito → vale 0,
+// come non esserci mai arrivato. E il caso migliore non passa 0.10: è una
+// valvola di sfogo, non una misura.
+const RIF_TABELLONE_ALTO = { mai: 0, male: 0, vicino: 0.05, vinto: 0.10 };
 // La classifica AIBVC è l'unica misura oggettiva del questionario: pesa più di
 // qualsiasi ricordo, ed è già una sintesi di 365 giorni di risultati.
 const RIF_CLASSIFICA = { primi20: 0.40, tra21e50: 0.25, tra51e100: 0.05, oltre100: -0.20, non_lo_so: 0 };
