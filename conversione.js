@@ -39,12 +39,16 @@ const MATRICE_SENZA_TORNEI = {
 // Dove arriva DI SOLITO: pesa. Il MIGLIORE piazzamento: solo un incremento —
 // così chi in silver ci è arrivato una domenica per caso non viene contato
 // come chi ci sta stabilmente (indicazione di Simone, 29/08).
-const RIF_SPESSO = { gironi: -0.40, quarti: -0.15, semifinale: 0.15, finale: 0.40 };
-const RIF_MIGLIORE = { gironi: -0.05, quarti: 0, semifinale: 0.10, finale: 0.20 };
+const RIF_SPESSO = { esco_subito: -0.35, una_due: 0, semi_finale: 0.35 };
+// Essere arrivati in un tabellone più alto conta poco: con un girone facile ci
+// finisci per caso. Conta com'è andata una volta lì.
+const RIF_TABELLONE_ALTO = { mai: 0, male: 0.05, vicino: 0.15, vinto: 0.25 };
+// La classifica AIBVC è l'unica misura oggettiva del questionario: pesa più di
+// qualsiasi ricordo, ed è già una sintesi di 365 giorni di risultati.
+const RIF_CLASSIFICA = { primi20: 0.40, tra21e50: 0.25, tra51e100: 0.05, oltre100: -0.20, non_lo_so: 0 };
 const RIF_BATTUTA = { mai: -0.25, provo: -0.10, forte: 0.10, disinvolto: 0.25 };
 const RIF_SEGNALI = { mai: -0.1, ogni_tanto: 0.1, sempre_codice: 0.3 };
 
-const ORDINE_PIAZZAMENTO = { gironi: 0, quarti: 1, semifinale: 2, finale: 3 };
 const TETTO_RIFINITURA = 0.70;
 
 // r = { q5, q7, q8, q9, q10, q1, q2, q4, compagni }
@@ -55,14 +59,20 @@ export function computaLivello(r) {
     strada = "C";
     base = BASE_FEDERALE[r.q5];
     margineMin = margineMax = 0.5;
-    rifinitura = (RIF_SPESSO[r.q8] || 0) + (RIF_MIGLIORE[r.q9] || 0) + (RIF_BATTUTA[r.q10] || 0);
+    // chi sa la sua classifica viene valutato su quella; agli altri restano i
+    // piazzamenti, che sono ricordi e valgono meno
+    const daClassifica = r.q11 && r.q11 !== "non_lo_so";
+    rifinitura = (RIF_BATTUTA[r.q10] || 0) + (daClassifica
+      ? (RIF_CLASSIFICA[r.q11] || 0)
+      : (RIF_SPESSO[r.q8] || 0) + (RIF_TABELLONE_ALTO[r.q9] || 0));
+    if (daClassifica) margineMin = margineMax = 0.4;
 
   } else if (r.q5 === "scuola") {
     strada = "A";
     base = BASE_TABELLONE[r.q7];
     margineMin = margineMax = 0.6;
     // la battuta in salto si chiede solo nel gold: sotto non separa nessuno
-    rifinitura = (RIF_SPESSO[r.q8] || 0) + (RIF_MIGLIORE[r.q9] || 0) +
+    rifinitura = (RIF_SPESSO[r.q8] || 0) + (RIF_TABELLONE_ALTO[r.q9] || 0) +
                  (r.q7 === "gold" ? (RIF_BATTUTA[r.q10] || 0) : 0);
     if (base === undefined) { base = 3.2; guardiaAttiva = true; }
 
@@ -95,8 +105,12 @@ export function computaLivello(r) {
   // --- guardie di coerenza: non si sceglie chi ha ragione, si segna il profilo
   // e lo guarda Simone. Il margine intanto resta largo. ---
 
-  // il miglior piazzamento non può essere peggiore di quello abituale
-  if (r.q8 && r.q9 && ORDINE_PIAZZAMENTO[r.q9] < ORDINE_PIAZZAMENTO[r.q8]) guardiaAttiva = true;
+  // ai tornei L2 può iscriversi solo chi non è tra i primi 20 della classifica
+  // AIBVC: le due risposte non possono stare insieme
+  if (r.q5 === "AIBVC_L2" && r.q11 === "primi20") guardiaAttiva = true;
+  // dice di arrivare in fondo quasi sempre, ma di non essere mai finito in un
+  // tabellone più alto del solito
+  if (r.q8 === "semi_finale" && r.q9 === "mai") guardiaAttiva = true;
   // gioca gold o federale ma non prova nemmeno la battuta in salto: una delle
   // due risposte non torna (a quel livello la saltano tutti)
   if ((strada === "C" || (strada === "A" && r.q7 === "gold")) && r.q10 === "mai") guardiaAttiva = true;

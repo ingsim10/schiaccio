@@ -22,15 +22,26 @@ export const DOMANDE = [
   { key: "q7", testo: "In quale tabellone giochi di solito?", opzioni: [
       ["bronze", "Bronze"], ["silver", "Silver"], ["gold", "Gold"] ] },
 
-  // --- chi fa tornei (scuola o federali): quanto va a fondo ---
-  // "più spesso" pesa, "il migliore" dà solo un piccolo incremento: così chi in
-  // silver ci è arrivato una domenica per caso non viene contato come chi ci sta
-  { key: "q8", testo: "Nei tornei che fai, dove arrivi più spesso?", opzioni: [
-      ["gironi", "Esco nei gironi"], ["quarti", "Arrivo ai quarti"],
-      ["semifinale", "Arrivo in semifinale"], ["finale", "Finale o vittoria"] ] },
-  { key: "q9", testo: "E il tuo miglior piazzamento?", opzioni: [
-      ["gironi", "Mai oltre i gironi"], ["quarti", "Quarti"],
-      ["semifinale", "Semifinale"], ["finale", "Finale o vittoria"] ] },
+  // --- federali: la classifica AIBVC è una misura vera, batte i ricordi ---
+  // Regolamento AIBVC: classifica unica nazionale, migliori 10 tornei degli
+  // ultimi 365 giorni. Ai tornei L2 può iscriversi solo chi NON è tra i primi 20.
+  { key: "q11", testo: "In classifica AIBVC, più o meno dove stai?", opzioni: [
+      ["primi20", "Nei primi 20"], ["tra21e50", "Tra il 21° e il 50°"],
+      ["tra51e100", "Tra il 51° e il 100°"], ["oltre100", "Oltre il 100°"],
+      ["non_lo_so", "Non lo so / non ci sono"] ] },
+
+  // --- chi fa tornei: quanto va a fondo. Il formato vero (parole di Simone):
+  // 3 partite di girone che ti smistano nel bronze/silver/gold, poi 3-4 partite
+  // al massimo. Quindi non "quarti/semifinale" ma quante partite vinci. ---
+  { key: "q8", testo: "Nel tuo tabellone, dove arrivi più spesso?", opzioni: [
+      ["esco_subito", "Esco subito"], ["una_due", "Vinco una o due partite"],
+      ["semi_finale", "Arrivo in semifinale o in finale"] ] },
+  // Non chiede il miglior piazzamento in sé — un girone facile ti porta nel gold
+  // per caso — ma com'è andata quando ci sei arrivato: è lì che si vede se il
+  // tabellone alto era tuo o del sorteggio.
+  { key: "q9", testo: "Ti è capitato di finire in un tabellone più alto del solito?", opzioni: [
+      ["mai", "No, mai"], ["male", "Sì, ma le ho prese"],
+      ["vicino", "Sì, e ho perso di poco"], ["vinto", "Sì, e ho vinto qualche partita"] ] },
 
   // --- gold e federali: qui i segnali non dicono più niente, la battuta sì ---
   { key: "q10", testo: "La battuta in salto?", opzioni: [
@@ -62,9 +73,14 @@ export function domandeAttive(risposte){
   // la battuta in salto si chiede solo dove distingue davvero: gold e federali
   const alto = federale || (scuola && risposte.q7 === "gold");
 
+  // a un federale i piazzamenti si chiedono solo se non sa la sua classifica:
+  // la classifica dice già come è andato negli ultimi 365 giorni
+  const classificaIgnota = !risposte.q11 || risposte.q11 === "non_lo_so";
+
   return DOMANDE.filter((d) => {
     if (d.key === "q7") return scuola;
-    if (d.key === "q8" || d.key === "q9") return tornei;
+    if (d.key === "q11") return federale;
+    if (d.key === "q8" || d.key === "q9") return scuola || (federale && classificaIgnota);
     if (d.key === "q10") return alto;
     if (d.key === "q1" || d.key === "q2") return senzaTornei;
     if (d.key === "q4") return senzaTornei;
@@ -78,6 +94,7 @@ export function allineaRisposte(risposte, valoreQ5){
   const federale = FEDERALI.includes(valoreQ5);
   const scuola = valoreQ5 === "scuola";
   if (!scuola) delete risposte.q7;
+  if (!federale) delete risposte.q11;
   if (!federale && !scuola) { delete risposte.q8; delete risposte.q9; delete risposte.q10; }
   if (valoreQ5 !== "non_faccio_tornei") { delete risposte.q1; delete risposte.q2; delete risposte.q4; }
   delete risposte.q6;   // vecchia domanda "dove smetti di vincere", non esiste più
