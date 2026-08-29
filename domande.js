@@ -33,7 +33,7 @@ export const DOMANDE = [
   // --- chi fa tornei: quanto va a fondo. Il formato vero (parole di Simone):
   // 3 partite di girone che ti smistano nel bronze/silver/gold, poi 3-4 partite
   // al massimo. Quindi non "quarti/semifinale" ma quante partite vinci. ---
-  { key: "q8", testo: "Nel tuo tabellone, dove arrivi più spesso?", opzioni: [
+  { key: "q8", testo: "E lì dove arrivi più spesso?", opzioni: [
       ["esco_subito", "Eliminato subito"], ["una_due", "Un po' vado avanti"],
       ["semi_finale", "Semifinale o finale"] ] },
   // Non chiede il miglior piazzamento in sé — un girone facile ti porta nel gold
