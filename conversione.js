@@ -28,7 +28,20 @@ export function getFascia(valore) {
 }
 
 const BASE_FEDERALE = { AIBVC_L2: 5.8, AIBVC_L1: 6.2, FIPAV: 6.6 };
-const BASE_TABELLONE = { bronze: 2.6, silver: 3.6, gold: 4.8 };
+
+// Tabellone × quanto ci vai a fondo. Non è una base con una correzione, ma una
+// tabella sola, perché l'apertura cambia moltissimo col tabellone (29/08,
+// Simone): nel bronze ci sta dentro di tutto — chi ha appena iniziato il corso
+// e fa il suo primo torneo, e chi sta per salire — mentre nel gold il ventaglio
+// è stretto. Un bronze che parte da 1.3 con la stessa apertura del gold
+// lascerebbe "Principiante" anche chi il bronze lo vince.
+const MATRICE_SCUOLA = {
+  bronze: { esco_subito: 1.3, una_due: 2.0, semi_finale: 2.7 },
+  silver: { esco_subito: 3.0, una_due: 3.6, semi_finale: 4.2 },
+  gold:   { esco_subito: 4.6, una_due: 5.0, semi_finale: 5.4 },
+};
+// e per lo stesso motivo l'incertezza è più larga in basso
+const MARGINE_TABELLONE = { bronze: 0.8, silver: 0.6, gold: 0.5 };
 
 const MATRICE_SENZA_TORNEI = {
   mai: { mai: 1.2, amatoriale: 1.6, serieDC: 2.8, serieBplus: 3.4 },
@@ -36,13 +49,14 @@ const MATRICE_SENZA_TORNEI = {
   piuDi3: { mai: 2.2, amatoriale: 2.5, serieDC: 3.2, serieBplus: 3.8 },
 };
 
-// Dove arriva DI SOLITO: pesa. Il MIGLIORE piazzamento: solo un incremento —
-// così chi in silver ci è arrivato una domenica per caso non viene contato
-// come chi ci sta stabilmente (indicazione di Simone, 29/08).
+// Per i federali che non sanno la loro classifica: lì il tabellone non c'è,
+// resta solo quanto vanno a fondo.
 const RIF_SPESSO = { esco_subito: -0.35, una_due: 0, semi_finale: 0.35 };
-// Essere arrivati in un tabellone più alto conta poco: con un girone facile ci
-// finisci per caso. Conta com'è andata una volta lì.
-const RIF_TABELLONE_ALTO = { mai: 0, male: 0.05, vicino: 0.15, vinto: 0.25 };
+// Essere finiti in un tabellone più alto pesa pochissimo, ed è voluto: con un
+// girone facile ci finisci per sorteggio. La domanda serve soprattutto a dare
+// uno sfogo onesto a chi ci è arrivato — così non ha bisogno di gonfiare le
+// altre risposte per farlo sapere (parole di Simone: "senza mentire").
+const RIF_TABELLONE_ALTO = { mai: 0, male: 0.05, vicino: 0.10, vinto: 0.15 };
 // La classifica AIBVC è l'unica misura oggettiva del questionario: pesa più di
 // qualsiasi ricordo, ed è già una sintesi di 365 giorni di risultati.
 const RIF_CLASSIFICA = { primi20: 0.40, tra21e50: 0.25, tra51e100: 0.05, oltre100: -0.20, non_lo_so: 0 };
@@ -69,12 +83,13 @@ export function computaLivello(r) {
 
   } else if (r.q5 === "scuola") {
     strada = "A";
-    base = BASE_TABELLONE[r.q7];
-    margineMin = margineMax = 0.6;
+    const riga = MATRICE_SCUOLA[r.q7];
+    base = riga ? riga[r.q8] : undefined;
+    margineMin = margineMax = MARGINE_TABELLONE[r.q7] || 0.8;
     // la battuta in salto si chiede solo nel gold: sotto non separa nessuno
-    rifinitura = (RIF_SPESSO[r.q8] || 0) + (RIF_TABELLONE_ALTO[r.q9] || 0) +
+    rifinitura = (RIF_TABELLONE_ALTO[r.q9] || 0) +
                  (r.q7 === "gold" ? (RIF_BATTUTA[r.q10] || 0) : 0);
-    if (base === undefined) { base = 3.2; guardiaAttiva = true; }
+    if (base === undefined) { base = 3.2; rifinitura = 0; guardiaAttiva = true; }
 
   } else {
     strada = "B";
