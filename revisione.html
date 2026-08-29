@@ -111,7 +111,11 @@ async function caricaProfili(){
     const tr = document.createElement("tr");
     if (v.guardiaAttiva) tr.classList.add("guardia");
     tr.innerHTML =
-      '<td><b>' + (d.nome || "—") + '</b><br><span class="muted">' + (d.telefono || "") + '</span></td>' +
+      '<td><b>' + (d.nome || "—") + '</b><br><span class="muted">' + (d.telefono || "") + '</span>' +
+        (d.storicoValutazioni && d.storicoValutazioni.length
+          ? '<br><span class="muted">rifatta ' + d.storicoValutazioni.length +
+            (d.storicoValutazioni.length === 1 ? ' volta' : ' volte') + '</span>'
+          : '') + '</td>' +
       '<td>' + fmtRisposte(d.risposte) + '</td>' +
       '<td><span class="pill">' + (v.strada || "—") + '</span>' + (v.guardiaAttiva ? '<br><span class="muted">⚠️ da ricontrollare</span>' : '') + '</td>' +
       '<td><b>' + (v.valore ?? "—") + '</b><br><span class="muted">' + (v.fasciaNome || "") + '</span></td>' +

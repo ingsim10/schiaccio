@@ -258,6 +258,7 @@
             <p>Sei nell'elenco. Da qui vedi le partite in formazione della tua fascia: ti iscrivi a una che c'è già, oppure prendi tu il campo e la crei.</p>
             <p>Perché una partita parta servono quattro giocatori dello stesso livello. In due non si gioca.</p>
           </div>
+          <button class="btn btn-ghost" id="btnRifai" style="margin-top:12px;">Rifai l'autovalutazione</button>
         </div>
       </div>
       <div class="bottombar col">
@@ -479,11 +480,21 @@ function domandeAttive(){
   return DOMANDE.filter(d => !(d.key === "q6" && risposte.q5 === "non_faccio_tornei"));
 }
 
-function startAutovalutazione(){
+function startAutovalutazione(prefill){
   stepIndex = 0;
-  risposte = {};
+  // rifacendo il questionario si riparte dalle risposte di prima: si cambia
+  // quella sbagliata invece di ricominciare da zero (serve soprattutto a
+  // Simone, che dovra' tarare la conversione provando una risposta alla volta)
+  risposte = prefill ? { ...prefill } : {};
   renderStep();
 }
+
+document.getElementById("btnRifai").addEventListener("click", () => {
+  const conferma = confirm("Rifai le 6 domande? Riparti dalle risposte di prima e il livello viene ricalcolato. Quello vecchio resta segnato.");
+  if (!conferma) return;
+  startAutovalutazione((userDocData && userDocData.risposte) || null);
+  showScreen("screen-auto");
+});
 
 function renderProgress(){
   const bar = document.getElementById("autoProgress");
@@ -565,16 +576,36 @@ document.getElementById("btnAutoAvanti").addEventListener("click", async () => {
 
   // ultima domanda → calcola e salva
   const valutazione = computaLivello(risposte);
+  const precedente = (userDocData && userDocData.valutazione) || null;
   const ref = doc(db, "users", currentUser.uid);
   const payload = {
     risposte,
     valutazione,
-    revisione: { valoreCorretto: null, note: "", correttoDa: null, correttoAt: null },
     autovalutazioneCompletata: true,
     valutazioneCalcolataAt: serverTimestamp(),
   };
+  // lo spazio per la correzione manuale si prepara solo la prima volta:
+  // rifare le domande non deve cancellare una correzione gia' fatta da Simone
+  if (!userDocData || !userDocData.revisione) {
+    payload.revisione = { valoreCorretto: null, note: "", correttoDa: null, correttoAt: null };
+  }
+  // ogni rifacimento resta tracciato: serve a tarare, e a vedere chi rifa'
+  // il questionario finche' non ottiene la fascia che vuole
+  const vecchiaRiga = precedente ? {
+    valore: precedente.valore,
+    fasciaNome: precedente.fasciaNome || "",
+    quando: new Date().toISOString(),
+  } : null;
+  if (vecchiaRiga) payload.storicoValutazioni = arrayUnion(vecchiaRiga);
+
   await setDoc(ref, payload, { merge: true });
-  userDocData = { ...(userDocData || {}), ...payload };
+
+  const localePayload = { ...payload };
+  delete localePayload.storicoValutazioni;
+  userDocData = { ...(userDocData || {}), ...localePayload };
+  if (vecchiaRiga) {
+    userDocData.storicoValutazioni = (userDocData.storicoValutazioni || []).concat([vecchiaRiga]);
+  }
 
   mostraVerdetto(userDocData);
   showScreen("screen-verdetto");
