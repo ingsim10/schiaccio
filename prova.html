@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SCHIACCIO · banco di prova</title>
+<style>
+  :root{
+    --bg:#F1E7D2; --surface:#FFFFFF; --surface-2:#FAF4E8; --ink:#1E2A33;
+    --muted:#5C6B76; --line:#E4D9C2; --coral:#D6431F;
+    --blue:#156FA3; --blue-bg:#DFEFF9; --warn:#B08900;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#10161C; --surface:#1A232C; --surface-2:#151D25; --ink:#EDF3F7;
+      --muted:#93A3AE; --line:#2A3641; --coral:#E85433;
+      --blue:#5FB0E5; --blue-bg:#14384E; --warn:#E8C547;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:20px 16px 40px;}
+  h1{font-size:20px; margin:0 0 4px;}
+  h1 span{color:var(--coral);}
+  .sub{color:var(--muted); font-size:13px; margin:0 0 18px; line-height:1.5;}
+
+  .tabs{display:flex; gap:8px; margin-bottom:18px;}
+  .tab{
+    flex:1; padding:11px 12px; border-radius:12px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink); font-size:13.5px; font-weight:700; cursor:pointer;
+  }
+  .tab.on{background:var(--ink); color:var(--bg); border-color:var(--ink);}
+  .vista{display:none;} .vista.on{display:block;}
+
+  .domanda{margin-bottom:18px;}
+  .domanda p{margin:0 0 8px; font-size:14.5px; font-weight:700;}
+  .chips{display:flex; flex-wrap:wrap; gap:7px;}
+  .chip{
+    padding:9px 13px; border-radius:999px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink); font-size:13px; cursor:pointer;
+  }
+  .chip.on{background:var(--coral); color:#fff; border-color:var(--coral); font-weight:700;}
+  .spenta{opacity:.4;}
+  .spenta .chip{cursor:default;}
+  .nota{font-size:11.5px; color:var(--muted); margin:5px 0 0;}
+
+  .esito{
+    position:sticky; bottom:0; margin-top:22px; background:var(--surface);
+    border:1px solid var(--line); border-radius:16px; padding:16px;
+  }
+  .esito .riga{display:flex; justify-content:space-between; gap:12px; font-size:13px; padding:4px 0;}
+  .esito .riga b{font-weight:800;}
+  .grande{font-size:26px; font-weight:900; margin:0 0 2px;}
+  .valore{font-size:13px; color:var(--muted); margin:0 0 10px;}
+  .pill{display:inline-block; background:var(--blue-bg); color:var(--blue); border-radius:999px;
+    padding:4px 10px; font-size:11px; font-weight:800; margin-right:6px;}
+  .pill.allarme{background:color-mix(in srgb, var(--warn) 22%, var(--surface)); color:var(--warn);}
+  .barra{height:12px; border-radius:6px; background:var(--surface-2); border:1px solid var(--line); position:relative; margin:12px 0 6px;}
+  .banda{position:absolute; top:0; bottom:0; background:color-mix(in srgb, var(--coral) 35%, transparent); border-radius:6px;}
+  .punto{position:absolute; top:-3px; width:4px; height:18px; border-radius:2px; background:var(--coral);}
+  .scala{display:flex; justify-content:space-between; font-size:10.5px; color:var(--muted);}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top;}
+  th{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:800;}
+  td.num{font-weight:800; white-space:nowrap;}
+  .strada{display:inline-block; min-width:16px; text-align:center; border-radius:5px; padding:1px 5px;
+    font-size:10.5px; font-weight:800; background:var(--surface-2); border:1px solid var(--line);}
+  .tabella-scroll{overflow-x:auto;}
+  .avviso{background:color-mix(in srgb, var(--warn) 14%, var(--surface)); border:1px solid var(--warn);
+    border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.5; margin-bottom:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SCHIACCIO · banco di prova<span>.</span></h1>
+  <p class="sub">Solo l'autovalutazione, senza accesso e senza salvare niente: cambi una risposta e vedi subito dove finisce il livello. Serve a tarare i numeri, non ai giocatori.</p>
+
+  <div class="tabs">
+    <button class="tab on" data-vista="simulatore">Provo le risposte</button>
+    <button class="tab" data-vista="tabella">Tutti i casi possibili</button>
+  </div>
+
+  <div class="vista on" id="vista-simulatore">
+    <div id="domande"></div>
+    <div class="esito" id="esito"></div>
+  </div>
+
+  <div class="vista" id="vista-tabella">
+    <div class="avviso">Ogni riga è un giocatore possibile: tutte le combinazioni di risposte che il questionario può produrre, ordinate dal più debole al più forte. Se una riga ti sembra sbagliata, il numero da correggere sta in <b>conversione.js</b>.</div>
+    <div class="tabella-scroll"><table id="tabella"></table></div>
+  </div>
+</div>
+
+<script type="module">
+import { computaLivello, FASCE, getFascia } from "./conversione.js";
+import { DOMANDE, domandeAttive, allineaRisposte } from "./domande.js";
+
+const MIN_SCALA = 1.0, MAX_SCALA = 7.0;
+
+// etichette leggibili per ogni risposta, prese dalle domande stesse
+const ETICHETTE = {};
+DOMANDE.forEach((d) => {
+  if (!d.opzioni) return;
+  ETICHETTE[d.key] = {};
+  d.opzioni.forEach(([val, label]) => { ETICHETTE[d.key][val] = label; });
+});
+
+// ---------- quali partite può giocare, con la regola vera del cancello ----------
+function fasceRaggiungibili(v){
+  const lo = v.valore - v.margineMin, hi = v.valore + v.margineMax;
+  return FASCE.filter((f) => hi >= f.min && lo <= f.max).map((f) => f.nome);
+}
+
+// ---------- simulatore ----------
+let risposte = {};
+
+function renderDomande(){
+  const attive = domandeAttive(risposte).filter((d) => !d.libera);
+  const cont = document.getElementById("domande");
+  cont.innerHTML = "";
+
+  DOMANDE.filter((d) => !d.libera).forEach((d) => {
+    const viva = attive.some((a) => a.key === d.key);
+    const box = document.createElement("div");
+    box.className = "domanda" + (viva ? "" : " spenta");
+    let html = "<p>" + d.testo + "</p><div class='chips'>";
+    d.opzioni.forEach(([val, label]) => {
+      const on = risposte[d.key] === val ? " on" : "";
+      html += '<button class="chip' + on + '" data-key="' + d.key + '" data-val="' + val + '"' +
+        (viva ? "" : " disabled") + ">" + label + "</button>";
+    });
+    html += "</div>";
+    if (!viva) html += '<p class="nota">Non compare a chi ha risposto così alla prima domanda: nel suo caso non sposta il livello.</p>';
+    box.innerHTML = html;
+    cont.appendChild(box);
+  });
+
+  cont.querySelectorAll(".chip").forEach((c) => {
+    c.addEventListener("click", () => {
+      const k = c.dataset.key;
+      risposte[k] = c.dataset.val;
+      if (k === "q5") allineaRisposte(risposte, c.dataset.val);
+      renderDomande();
+      renderEsito();
+    });
+  });
+}
+
+function renderEsito(){
+  const box = document.getElementById("esito");
+  const attive = domandeAttive(risposte).filter((d) => !d.libera);
+  const mancanti = attive.filter((d) => !risposte[d.key]);
+
+  if (mancanti.length){
+    box.innerHTML = '<p class="valore">Mancano ancora ' + mancanti.length +
+      (mancanti.length === 1 ? " risposta" : " risposte") + ".</p>";
+    return;
+  }
+
+  const v = computaLivello(risposte);
+  const lo = Math.max(MIN_SCALA, v.valore - v.margineMin);
+  const hi = Math.min(MAX_SCALA, v.valore + v.margineMax);
+  const pct = (x) => ((x - MIN_SCALA) / (MAX_SCALA - MIN_SCALA)) * 100;
+
+  box.innerHTML =
+    '<p class="grande">' + v.fasciaNome + '</p>' +
+    '<p class="valore">' + v.fasciaSottotitolo + '</p>' +
+    '<div class="barra">' +
+      '<span class="banda" style="left:' + pct(lo) + '%; width:' + (pct(hi) - pct(lo)) + '%"></span>' +
+      '<span class="punto" style="left:calc(' + pct(v.valore) + '% - 2px)"></span>' +
+    '</div>' +
+    '<div class="scala"><span>1.0</span><span>4.0</span><span>7.0</span></div>' +
+    '<div class="riga"><span>Livello</span><b>' + v.valore.toFixed(2) + '</b></div>' +
+    '<div class="riga"><span>Margine</span><b>−' + v.margineMin + " / +" + v.margineMax + '</b></div>' +
+    '<div class="riga"><span>Intervallo</span><b>' + lo.toFixed(2) + " – " + hi.toFixed(2) + '</b></div>' +
+    '<div class="riga"><span>Può giocare le partite di fascia</span><b style="text-align:right">' +
+      fasceRaggiungibili(v).join(", ") + '</b></div>' +
+    '<div style="margin-top:10px">' +
+      '<span class="pill">strada ' + v.strada + '</span>' +
+      (v.guardiaAttiva ? '<span class="pill allarme">⚠️ da ricontrollare a mano</span>' : '') +
+    '</div>';
+}
+
+// ---------- tutti i casi possibili ----------
+function tutteLeCombinazioni(){
+  const Q1 = ["mai", "da1a3", "piuDi3"];
+  const Q2 = ["mai", "amatoriale", "serieDC", "serieBplus"];
+  const Q4 = ["mai", "ogni_tanto", "sempre_codice"];
+  const Q6 = ["vince_raramente_bronze", "vince_bronze_perde_silver", "silver_se_la_gioca",
+              "vince_silver_perde_gold", "gold_se_la_gioca"];
+  const out = [];
+
+  ["AIBVC_L2", "AIBVC_L1", "FIPAV"].forEach((q5) => out.push({ q5 }));
+  Q6.forEach((q6) => Q4.forEach((q4) => out.push({ q5: "scuola", q6, q4 })));
+  Q1.forEach((q1) => Q2.forEach((q2) => Q4.forEach((q4) =>
+    out.push({ q5: "non_faccio_tornei", q6: "non_faccio_tornei", q1, q2, q4 }))));
+
+  return out;
+}
+
+function descrivi(r){
+  const parti = [];
+  ["q5", "q6", "q1", "q2", "q4"].forEach((k) => {
+    if (!r[k]) return;
+    if (k === "q6" && r.q6 === "non_faccio_tornei") return;
+    parti.push(ETICHETTE[k][r[k]]);
+  });
+  return parti.join(" · ");
+}
+
+function renderTabella(){
+  const righe = tutteLeCombinazioni()
+    .map((r) => ({ r, v: computaLivello(r) }))
+    .sort((a, b) => a.v.valore - b.v.valore);
+
+  let html = "<tr><th>Chi è</th><th>Livello</th><th>Fascia</th><th>Margine</th><th>Entra in</th></tr>";
+  righe.forEach(({ r, v }) => {
+    html += "<tr>" +
+      '<td><span class="strada">' + v.strada + "</span> " + descrivi(r) + "</td>" +
+      '<td class="num">' + v.valore.toFixed(2) + (v.guardiaAttiva ? " ⚠️" : "") + "</td>" +
+      "<td>" + v.fasciaNome + "</td>" +
+      '<td class="num">−' + v.margineMin + "/+" + v.margineMax + "</td>" +
+      "<td>" + fasceRaggiungibili(v).join(", ") + "</td>" +
+      "</tr>";
+  });
+  html += '<tr><td colspan="5" class="nota">' + righe.length +
+    " casi possibili in tutto. Le fasce: " +
+    FASCE.map((f) => f.nome + " " + f.min.toFixed(1) + "–" + f.max.toFixed(1)).join(" · ") +
+    "</td></tr>";
+  document.getElementById("tabella").innerHTML = html;
+}
+
+// ---------- navigazione ----------
+document.querySelectorAll(".tab").forEach((t) => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((x) => x.classList.remove("on"));
+    document.querySelectorAll(".vista").forEach((x) => x.classList.remove("on"));
+    t.classList.add("on");
+    document.getElementById("vista-" + t.dataset.vista).classList.add("on");
+  });
+});
+
+renderDomande();
+renderEsito();
+renderTabella();
+</script>
+</body>
+</html>
