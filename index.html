@@ -240,7 +240,7 @@
           <div class="radio-chip" data-val="F">Donna</div>
           <div class="radio-chip" data-val="M">Uomo</div>
         </div>
-        <p class="field-hint">Non influisce sul tuo livello ora. Lo raccogliamo per quando gestiremo le partite miste.</p>
+        <p class="field-hint">Non influisce sul tuo livello: serve a sapere chi può iscriversi alle partite maschili, femminili e miste.</p>
 
         <div id="profiloError" class="error-box" style="display:none; margin-top:16px;"></div>
       </div>
@@ -281,6 +281,7 @@
             <p>Perché una partita parta servono quattro giocatori dello stesso livello. In due non si gioca.</p>
           </div>
           <button class="btn btn-ghost" id="btnRifai" style="margin-top:12px;">Rifai l'autovalutazione</button>
+          <button class="btn btn-ghost" id="btnModificaProfilo">Modifica il profilo</button>
         </div>
       </div>
       <div class="bottombar col">
@@ -318,6 +319,14 @@
 
         <label for="inpQuando">Quando</label>
         <input type="datetime-local" id="inpQuando">
+
+        <label>Tipo di partita<button class="info" data-info="tipo-partita">i</button></label>
+        <div class="radio-row" id="rowTipo">
+          <div class="radio-chip" data-val="maschile">Maschile</div>
+          <div class="radio-chip" data-val="femminile">Femminile</div>
+          <div class="radio-chip" data-val="mista">Mista</div>
+        </div>
+        <p class="field-hint">Nelle miste si gioca in coppie uomo-donna e <b>non si prendono punti</b>: servono a organizzarsi, non a misurare.</p>
 
         <label for="selFascia">Fascia della partita<button class="info" data-info="fascia-partita">i</button></label>
         <select id="selFascia"></select>
@@ -437,10 +446,14 @@ onAuthStateChanged(auth, async (user) => {
 function prefillProfilo(user){
   document.getElementById("profAvatar").src = user.photoURL || "";
   document.getElementById("profEmail").textContent = user.email || "";
-  document.getElementById("inpNome").value = user.displayName || "";
-  document.getElementById("inpTelefono").value = "";
+  document.getElementById("inpNome").value = (userDocData && userDocData.nome) || user.displayName || "";
+  document.getElementById("inpTelefono").value = (userDocData && userDocData.telefono) || "";
   document.querySelectorAll("#rowSesso .radio-chip").forEach(c => c.classList.remove("on"));
-  sessoScelto = "";
+  sessoScelto = (userDocData && userDocData.sesso) || "";
+  if (sessoScelto) {
+    const gia = document.querySelector('#rowSesso .radio-chip[data-val="' + sessoScelto + '"]');
+    if (gia) gia.classList.add("on");
+  }
 }
 
 let sessoScelto = "";
@@ -467,11 +480,18 @@ document.getElementById("btnProfiloContinua").addEventListener("click", async ()
     errBox.style.display = "block";
     return;
   }
+  // obbligatorio da quando le partite sono maschili, femminili o miste: senza,
+  // non si potrebbe dire chi può iscriversi a cosa
+  if (!sessoScelto) {
+    errBox.textContent = "Scegli donna o uomo: serve per le partite maschili, femminili e miste.";
+    errBox.style.display = "block";
+    return;
+  }
   errBox.style.display = "none";
 
   const ref = doc(db, "users", currentUser.uid);
   const payload = {
-    nome, telefono, sesso: sessoScelto || "",
+    nome, telefono, sesso: sessoScelto,
     email: currentUser.email || "",
     fotoURL: currentUser.photoURL || "",
     profiloCompletato: true,
@@ -511,6 +531,12 @@ function startAutovalutazione(prefill){
   risposte = prefill ? { ...prefill } : {};
   renderStep();
 }
+
+document.getElementById("btnModificaProfilo").addEventListener("click", () => {
+  prefillProfilo(currentUser);
+  document.getElementById("profiloError").style.display = "none";
+  showScreen("screen-profilo");
+});
 
 document.getElementById("btnRifai").addEventListener("click", () => {
   const conferma = confirm("Rifai le 6 domande? Riparti dalle risposte di prima e il livello viene ricalcolato. Quello vecchio resta segnato.");
@@ -732,6 +758,13 @@ const SPIEGAZIONI = {
       "Rispondi come giochi davvero, non come vorresti giocare: un livello gonfiato ti fa finire in partite in cui non ti diverti. E se sbagli una risposta, puoi rifare tutto quando vuoi.",
     ],
   },
+  "tipo-partita": {
+    titolo: "Maschile, femminile o mista",
+    testo: [
+      "Le partite maschili le giocano uomini, le femminili donne. Le miste si giocano in coppie uomo-donna: due e due.",
+      "Nelle miste non si prendono punti e il livello non si muove. Non è una punizione: uomini e donne non si affrontano mai nelle altre partite, quindi mettere i risultati delle miste nella stessa classifica falserebbe tutte e due. Le miste servono a organizzarsi e a giocare, che è già il motivo per cui sei qui.",
+    ],
+  },
   "fascia-partita": {
     titolo: "Quale fascia scegliere",
     testo: [
@@ -818,6 +851,24 @@ function mioIntervallo(){
   };
 }
 
+// Secondo cancello, indipendente dal livello: maschile, femminile o mista.
+// Nelle miste si gioca in coppie uomo-donna, quindi due uomini e due donne:
+// il terzo dello stesso sesso resta fuori anche se il posto c'è.
+function motivoSesso(p){
+  const mio = (userDocData && userDocData.sesso) || "";
+  if (!mio) return "Compila il sesso nel profilo: serve per sapere a quali partite puoi iscriverti.";
+  const tipo = p.tipo || "maschile";
+  if (tipo === "maschile" && mio !== "M") return "È una partita maschile.";
+  if (tipo === "femminile" && mio !== "F") return "È una partita femminile.";
+  if (tipo === "mista") {
+    const gia = (p.giocatori || []).filter((x) => x.sesso === mio).length;
+    if (gia >= 2) return mio === "F"
+      ? "Nella mista ci stanno due donne, e ci sono già."
+      : "Nella mista ci stanno due uomini, e ci sono già.";
+  }
+  return "";
+}
+
 // Il cancello confronta INTERVALLI, non numeri (decisione 15/08): chi è in
 // calibrazione ha una banda larga e si sovrappone a più partite; chi è
 // calibrato stretto entra solo dove sta davvero.
@@ -902,6 +953,9 @@ function cardPartita(p){
   const dentro = g.some((x) => x.uid === mioUid);
   const piena = g.length >= POSTI;
   const ok = passaIlCancello(p);
+  const bloccoSesso = motivoSesso(p);
+  const tipo = p.tipo || "maschile";
+  const nomeTipo = { maschile: "Maschile", femminile: "Femminile", mista: "Mista" }[tipo];
   const media = mediaPartita(p);
   const mia = p.creatoDa === mioUid;
   const invitato = p.id === invitoId;
@@ -918,6 +972,8 @@ function cardPartita(p){
     azione = '<button class="btn btn-sm btn-out" data-esci="' + p.id + '">Esco</button>';
   } else if (piena){
     azione = '<button class="btn btn-sm btn-bloccato" disabled>Completa</button>';
+  } else if (bloccoSesso && !sonoAdmin()){
+    azione = '<button class="btn btn-sm btn-bloccato" disabled>Non puoi iscriverti</button>';
   } else if (!ok && !sonoAdmin()){
     azione = '<button class="btn btn-sm btn-bloccato" data-bloccato="' + p.id + '">Fuori dalla tua fascia</button>';
   } else {
@@ -928,7 +984,9 @@ function cardPartita(p){
     ? '<button class="btn btn-sm btn-out" data-annulla="' + p.id + '">Annulla</button>' : '';
 
   let motivo = "";
-  if (!ok && !dentro && !piena){
+  if (bloccoSesso && !dentro && !piena){
+    motivo = '<p class="motivo">' + esc(bloccoSesso) + '</p>';
+  } else if (!ok && !dentro && !piena){
     const miaFascia = ((userDocData || {}).valutazione || {}).fasciaNome || "";
     motivo = '<p class="motivo">È una partita di fascia ' + esc(p.fasciaNome) +
       ', tu sei ' + esc(miaFascia) + '. Toccala per segnalarmelo: se capita spesso, la fascia va allargata.</p>';
@@ -943,7 +1001,12 @@ function cardPartita(p){
     '<div class="card-top">' +
       '<div><p class="dove">' + esc(p.dove) + '</p>' +
       '<p class="quando">' + esc(fmtQuando(p.quando)) + '</p></div>' +
-      '<span class="banda">' + esc(p.fasciaNome) + '<button class="info" data-info="cancello">i</button></span>' +
+      '<div style="text-align:right">' +
+        '<span class="banda">' + esc(p.fasciaNome) + '<button class="info" data-info="cancello">i</button></span>' +
+        '<div style="margin-top:6px"><span class="banda">' + nomeTipo +
+          (tipo === "mista" ? " · senza punti" : "") +
+          '<button class="info" data-info="tipo-partita">i</button></span></div>' +
+      '</div>' +
     '</div>' +
     '<div class="posti"><span class="pallini">' + pallini + '</span>' +
       '<span class="posti-testo">' + testoPosti +
@@ -966,6 +1029,7 @@ function ioGiocatore(){
   return {
     uid: currentUser.uid,
     nome: (userDocData && userDocData.nome) || "",
+    sesso: (userDocData && userDocData.sesso) || "",
     valore: l.valore === undefined ? null : l.valore,
     margineMin: l.margineMin || 0,
     margineMax: l.margineMax || 0,
@@ -982,6 +1046,12 @@ async function iscriviti(id){
     const g = (p.giocatori || []).slice();
     if (g.some((x) => x.uid === me.uid)) return;
     if (g.length >= POSTI) throw new Error("Si è riempita un attimo prima di te.");
+    // ricontrollato qui e non solo sulla card: due persone possono toccare
+    // "mi iscrivo" nello stesso momento e riempire lo stesso posto
+    if ((p.tipo || "maschile") === "mista" &&
+        g.filter((x) => x.sesso === me.sesso).length >= 2) {
+      throw new Error("I posti per il tuo lato della coppia sono finiti.");
+    }
     g.push(me);
     tx.update(ref, { giocatori: g });
   });
@@ -1053,6 +1123,15 @@ document.getElementById("listaPartite").addEventListener("click", async (ev) => 
 });
 
 // ---------- CREA PARTITA ----------
+let tipoScelto = "";
+document.getElementById("rowTipo").addEventListener("click", (e) => {
+  const chip = e.target.closest(".radio-chip");
+  if (!chip) return;
+  document.querySelectorAll("#rowTipo .radio-chip").forEach(c => c.classList.remove("on"));
+  chip.classList.add("on");
+  tipoScelto = chip.dataset.val;
+});
+
 document.getElementById("btnNuovaPartita").addEventListener("click", () => {
   const sel = document.getElementById("selFascia");
   sel.innerHTML = FASCE.map((f, i) =>
@@ -1065,6 +1144,10 @@ document.getElementById("btnNuovaPartita").addEventListener("click", () => {
   }
   document.getElementById("inpDove").value = "";
   document.getElementById("inpQuando").value = "";
+  // proposta: la partita del proprio sesso, che è il caso più frequente
+  tipoScelto = (userDocData && userDocData.sesso) === "F" ? "femminile" : "maschile";
+  document.querySelectorAll("#rowTipo .radio-chip").forEach((c) =>
+    c.classList.toggle("on", c.dataset.val === tipoScelto));
   document.getElementById("creaError").style.display = "none";
   showScreen("screen-crea");
 });
@@ -1079,6 +1162,7 @@ document.getElementById("btnCreaPartita").addEventListener("click", async (ev) =
   const f = FASCE[Number(document.getElementById("selFascia").value)];
   err.style.display = "none";
 
+  if (!tipoScelto) return mostraErrore("Scegli se è maschile, femminile o mista.");
   if (!dove) return mostraErrore("Scrivi dove si gioca.");
   if (!quando) return mostraErrore("Metti giorno e ora.");
   if (new Date(quando).getTime() < Date.now() - 60 * 60 * 1000)
@@ -1094,6 +1178,10 @@ document.getElementById("btnCreaPartita").addEventListener("click", async (ev) =
     await addDoc(collection(db, "partite"), {
       dove: dove,
       quando: quando,
+      tipo: tipoScelto,
+      // nelle miste il livello non si muove: le due scale, maschile e
+      // femminile, non si incontrano mai altrove e mescolarle le falserebbe
+      conteggiaPunti: tipoScelto !== "mista",
       fasciaMin: f.min,
       fasciaMax: f.max,
       fasciaNome: f.nome,
