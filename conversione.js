@@ -34,10 +34,15 @@ const MATRICE_STRADA_B = {
   piuDi3: { mai: 2.2, amatoriale: 2.5, serieDC: 3.2, serieBplus: 3.8 },
 };
 
-const Q3_RIFINITURA = { bagher: -0.2, doppi_fischiati: 0, mani_ok: 0.2, dipende: 0.3 };
+// 29/08: la domanda sull'alzata e' stata tolta. Era la seconda leva piu'
+// pesante del questionario (cambiava fascia in 7-9 casi su 10) ma chiedeva un
+// giudizio che l'amatore non puo' dare: nelle partite tra amici non c'e'
+// nessun arbitro che fischia i doppi, quindi meta' delle risposte era
+// inventata. Una risposta inventata che sposta di una fascia intera vale meno
+// di una domanda in meno.
 const Q4_RIFINITURA = { mai: -0.1, ogni_tanto: 0.1, sempre_codice: 0.3 };
 
-// r = { q1, q2, q3, q4, q5, q6, compagni }
+// r = { q1, q2, q4, q5, q6, compagni }
 export function computaLivello(r) {
   let strada, base, margineMin, margineMax;
 
@@ -51,7 +56,12 @@ export function computaLivello(r) {
     margineMin = margineMax = 0.6;
   } else {
     strada = "B";
-    base = MATRICE_STRADA_B[r.q1][r.q2];
+    // rete di sicurezza: la strada B ha bisogno di q1 e q2, che il questionario
+    // chiede solo a chi dice di non fare tornei. Se mancano (dato importato,
+    // percorso cambiato a meta') non si tira a indovinare: valore centrale e
+    // profilo segnato per la revisione di Simone.
+    const riga = MATRICE_STRADA_B[r.q1];
+    base = riga && riga[r.q2] !== undefined ? riga[r.q2] : 2.2;
     margineMin = margineMax = 0.8;
     // ex-indoor in rodaggio (13/08): margine asimmetrico, quasi impossibile
     // sia sotto, molto probabile sia sopra → si apre verso l'alto
@@ -63,7 +73,7 @@ export function computaLivello(r) {
     }
   }
 
-  const rawRifinitura = (Q3_RIFINITURA[r.q3] || 0) + (Q4_RIFINITURA[r.q4] || 0);
+  const rawRifinitura = Q4_RIFINITURA[r.q4] || 0;
   let rifinitura = strada === "C" ? rawRifinitura / 2 : rawRifinitura;
   rifinitura = Math.max(-0.4, Math.min(0.4, rifinitura));
 
@@ -71,8 +81,12 @@ export function computaLivello(r) {
   // "debole" (o viceversa) → non si sceglie, si allarga il margine e si segna
   // per la revisione di Simone. Euristica di primo passo, da raffinare.
   let guardiaAttiva = false;
-  if (strada !== "B" && base >= 3.6 && rawRifinitura <= -0.2) guardiaAttiva = true;
-  if (strada === "B" && base <= 2.0 && rawRifinitura >= 0.4) guardiaAttiva = true;
+  if (!(MATRICE_STRADA_B[r.q1] || {})[r.q2] && strada === "B") guardiaAttiva = true;
+  // gioca tornei a buon livello ma a rete non fa mai segnali: una delle due
+  // risposte non torna
+  if (strada !== "B" && base >= 3.6 && r.q4 === "mai") guardiaAttiva = true;
+  // dice di non fare tornei e di giocare poco, ma ha un codice di segnali fisso
+  if (strada === "B" && base <= 2.0 && r.q4 === "sempre_codice") guardiaAttiva = true;
   // rete di sicurezza: dice di fare i tornei della scuola ma non dice dove
   // smette di vincere. Nel questionario non è più possibile, ma un dato
   // vecchio o importato finirebbe valutato come chi non gioca tornei.
