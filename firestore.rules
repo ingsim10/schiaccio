@@ -8,5 +8,24 @@ service cloud.firestore {
       allow read, update: if request.auth != null
         && request.auth.token.email == "simone.frattaioli@gmail.com";
     }
+    match /partite/{partitaId} {
+      // Chi ha fatto l'accesso vede le partite.
+      allow read: if request.auth != null;
+      // Si crea una partita solo a proprio nome.
+      allow create: if request.auth != null
+        && request.resource.data.creatoDa == request.auth.uid;
+      // Iscriversi e uscire tocca solo l'elenco dei giocatori: quello lo puo'
+      // fare chiunque sia dentro l'app. Cambiare il resto (annullare, spostare
+      // la fascia) resta a chi ha creato la partita e all'amministratore.
+      allow update: if request.auth != null && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['giocatori'])
+        || resource.data.creatoDa == request.auth.uid
+        || request.auth.token.email == "simone.frattaioli@gmail.com"
+      );
+      allow delete: if request.auth != null && (
+        resource.data.creatoDa == request.auth.uid
+        || request.auth.token.email == "simone.frattaioli@gmail.com"
+      );
+    }
   }
 }

@@ -116,6 +116,42 @@
   .bottombar.col{flex-direction:column; gap:8px;}
   .share-hint{margin:0; font-size:12px; color:var(--muted); text-align:center; line-height:1.4;}
 
+  /* --- partite in formazione --- */
+  select{
+    width:100%; box-sizing:border-box; padding:13px 14px; border-radius:12px;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:15px;
+  }
+  input[type=datetime-local]{
+    width:100%; box-sizing:border-box; padding:13px 14px; border-radius:12px;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:15px;
+  }
+  .list-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin:6px 0 12px;}
+  .list-head h1{margin:0;}
+  .count{font-size:12.5px; color:var(--muted); white-space:nowrap;}
+  .fascia-chip{
+    background:var(--blue-bg); color:var(--blue); border:none; border-radius:999px;
+    padding:5px 12px; font-size:11.5px; font-weight:800; cursor:pointer;
+  }
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 16px; margin-bottom:12px; box-shadow:var(--shadow);}
+  .card.dentro{border-color:var(--coral);}
+  .card.invito{border-color:var(--ok);}
+  .card-top{display:flex; justify-content:space-between; gap:10px; align-items:flex-start;}
+  .dove{font-size:16px; font-weight:800; margin:0;}
+  .quando{font-size:13px; color:var(--muted); margin:3px 0 0;}
+  .banda{background:var(--blue-bg); color:var(--blue); border-radius:999px; padding:4px 10px; font-size:11px; font-weight:800; white-space:nowrap;}
+  .posti{display:flex; align-items:center; gap:9px; margin:13px 0 8px;}
+  .pallini{display:flex; gap:5px;}
+  .pallino{width:11px; height:11px; border-radius:50%; background:var(--coral); display:inline-block;}
+  .pallino.vuoto{background:var(--line);}
+  .posti-testo{font-size:12.5px; color:var(--muted);}
+  .giocatori{font-size:12.5px; color:var(--muted); line-height:1.5; margin:0 0 12px;}
+  .card-azioni{display:flex; gap:8px;}
+  .btn-sm{padding:11px 14px; font-size:13.5px; border-radius:12px; flex:1;}
+  .btn-out{background:none; border:1px solid var(--line); color:var(--ink);}
+  .btn-bloccato{background:var(--surface-2); color:var(--muted); border:1px dashed var(--line); cursor:default;}
+  .motivo{font-size:12px; color:var(--warn); margin:9px 0 0; line-height:1.45;}
+  .badge-invito{background:color-mix(in srgb, var(--ok) 16%, var(--surface)); border:1px solid var(--ok); color:var(--ink); border-radius:10px; padding:8px 12px; font-size:12.5px; margin-bottom:10px;}
+
   .field-hint{font-size:12px; color:var(--muted); margin-top:6px; line-height:1.4;}
   .error-box{background:color-mix(in srgb, var(--coral) 12%, var(--surface)); border:1px solid var(--coral); color:var(--coral-ink); border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:16px;}
   .spinner{width:22px; height:22px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--coral); animation:spin 1s linear infinite;}
@@ -126,7 +162,10 @@
 <div class="phone">
   <div class="topbar">
     <div class="wordmark">SCHIACCIO<span class="dot"></span></div>
-    <button class="signout" id="btnSignout" style="display:none">Esci</button>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button class="fascia-chip" id="chipFascia" style="display:none"></button>
+      <button class="signout" id="btnSignout" style="display:none">Esci</button>
+    </div>
   </div>
 
   <main>
@@ -216,14 +255,56 @@
           </div>
           <div class="next-box">
             <h2>E adesso?</h2>
-            <p>Sei nell'elenco. Le partite le organizza Simone a mano: ti scrive su WhatsApp, al numero che hai lasciato, quando c'è un 2 contro 2 della tua fascia.</p>
+            <p>Sei nell'elenco. Da qui vedi le partite in formazione della tua fascia: ti iscrivi a una che c'è già, oppure prendi tu il campo e la crei.</p>
             <p>Perché una partita parta servono quattro giocatori dello stesso livello. In due non si gioca.</p>
           </div>
         </div>
       </div>
       <div class="bottombar col">
-        <button class="btn btn-primary" id="btnCondividi">Passa il link a chi gioca</button>
+        <button class="btn btn-primary" id="btnVaiPartite">Vedi le partite in formazione</button>
+        <button class="btn btn-ghost" id="btnCondividi">Passa il link a chi gioca</button>
         <p class="share-hint" id="shareHint">Più siete, prima parte una partita della tua fascia.</p>
+      </div>
+    </section>
+
+    <!-- ============ SCHERMATA: PARTITE IN FORMAZIONE ============ -->
+    <section class="screen" id="screen-partite">
+      <div class="scroll">
+        <div class="list-head">
+          <h1>Partite in formazione</h1>
+          <span class="count" id="contaPartite"></span>
+        </div>
+        <p id="listaMsg" class="motivo" style="display:none"></p>
+        <div id="listaPartite"></div>
+      </div>
+      <div class="bottombar col">
+        <button class="btn btn-primary" id="btnNuovaPartita">+ Crea una partita</button>
+        <p class="share-hint">Il campo lo prendi tu, gli altri si aggiungono qui.</p>
+      </div>
+    </section>
+
+    <!-- ============ SCHERMATA: CREA PARTITA ============ -->
+    <section class="screen" id="screen-crea">
+      <div class="scroll">
+        <h1>Crea una partita</h1>
+        <p class="lead">Prenoti il campo tu e ti iscrivi per primo. Gli altri tre si aggiungono da qui.</p>
+
+        <label for="inpDove">Dove</label>
+        <input type="text" id="inpDove" placeholder="Es. Eschilo 2 — campo 3">
+        <p class="field-hint">Scrivilo come lo diresti a un amico: nome del centro e, se serve, il campo.</p>
+
+        <label for="inpQuando">Quando</label>
+        <input type="datetime-local" id="inpQuando">
+
+        <label for="selFascia">Fascia della partita</label>
+        <select id="selFascia"></select>
+        <p class="field-hint">Chi sta fuori da questa fascia non si può iscrivere. Resta fissa: non si sposta quando entrano gli altri.</p>
+
+        <div id="creaError" class="error-box" style="display:none; margin-top:16px;"></div>
+      </div>
+      <div class="bottombar">
+        <button class="btn btn-ghost" id="btnAnnullaCrea">Indietro</button>
+        <button class="btn btn-primary" id="btnCreaPartita">Crea e iscrivimi</button>
       </div>
     </section>
 
@@ -236,10 +317,11 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, serverTimestamp
+  getFirestore, doc, getDoc, setDoc, serverTimestamp,
+  collection, addDoc, updateDoc, onSnapshot, query, where, runTransaction, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
-import { computaLivello } from "./conversione.js";
+import { firebaseConfig, EMAIL_ADMIN } from "./firebase-config.js";
+import { computaLivello, FASCE, getFascia } from "./conversione.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -298,7 +380,7 @@ onAuthStateChanged(auth, async (user) => {
     showScreen("screen-auto");
   } else {
     mostraVerdetto(userDocData);
-    showScreen("screen-verdetto");
+    apriPartite();
   }
 });
 
@@ -356,7 +438,7 @@ document.getElementById("btnProfiloContinua").addEventListener("click", async ()
 
   if (userDocData.autovalutazioneCompletata) {
     mostraVerdetto(userDocData);
-    showScreen("screen-verdetto");
+    apriPartite();
   } else {
     startAutovalutazione();
     showScreen("screen-auto");
@@ -504,6 +586,7 @@ function mostraVerdetto(data){
   document.getElementById("verdFascia").textContent = v.fasciaNome || "—";
   document.getElementById("verdSub").textContent = v.fasciaSottotitolo || "—";
   document.getElementById("verdReview").style.display = v.guardiaAttiva ? "block" : "none";
+  aggiornaChip();
 }
 // ---------- CONDIVIDI IL LINK ----------
 document.getElementById("btnCondividi").addEventListener("click", async () => {
@@ -520,6 +603,328 @@ document.getElementById("btnCondividi").addEventListener("click", async () => {
   } catch (e) {
     if (e && e.name === "AbortError") return;   // ha annullato: non e' un errore
     hint.textContent = url;
+  }
+});
+// ---------- PARTITE IN FORMAZIONE ----------
+const POSTI = 4;
+let partiteCache = [];
+let unsubPartite = null;
+const invitoId = new URLSearchParams(location.search).get("p") || "";
+
+function esc(t){
+  return String(t == null ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function sonoAdmin(){
+  return !!(currentUser && EMAIL_ADMIN && currentUser.email === EMAIL_ADMIN);
+}
+
+function msgLista(testo){
+  const el = document.getElementById("listaMsg");
+  el.textContent = testo;
+  el.style.display = testo ? "block" : "none";
+}
+
+function mioIntervallo(){
+  const v = (userDocData && userDocData.valutazione) || null;
+  if (!v) return null;
+  return {
+    valore: v.valore,
+    min: v.valore - (v.margineMin || 0),
+    max: v.valore + (v.margineMax || 0),
+  };
+}
+
+// Il cancello confronta INTERVALLI, non numeri (decisione 15/08): chi è in
+// calibrazione ha una banda larga e si sovrappone a più partite; chi è
+// calibrato stretto entra solo dove sta davvero.
+function passaIlCancello(p){
+  const mio = mioIntervallo();
+  if (!mio) return false;
+  return mio.max >= p.fasciaMin && mio.min <= p.fasciaMax;
+}
+
+function fmtQuando(iso){
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const giorno = d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+  const ora = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  return giorno + " · " + ora;
+}
+
+// Informazione, NON porta: la fascia resta quella fissata alla creazione,
+// altrimenti il bersaglio si sposta sotto i piedi di chi è entrato per primo.
+function mediaPartita(p){
+  const g = p.giocatori || [];
+  if (!g.length) return null;
+  const somma = g.reduce((tot, x) => tot + (x.valore || 0), 0);
+  return Math.round((somma / g.length) * 10) / 10;
+}
+
+function aggiornaChip(){
+  const chip = document.getElementById("chipFascia");
+  const v = (userDocData && userDocData.valutazione) || null;
+  if (!v){ chip.style.display = "none"; return; }
+  chip.textContent = v.fasciaNome;
+  chip.style.display = "block";
+}
+
+document.getElementById("chipFascia").addEventListener("click", () => {
+  mostraVerdetto(userDocData);
+  showScreen("screen-verdetto");
+});
+document.getElementById("btnVaiPartite").addEventListener("click", () => apriPartite());
+
+function apriPartite(){
+  showScreen("screen-partite");
+  if (unsubPartite) return;
+  const q = query(collection(db, "partite"), where("stato", "==", "aperta"));
+  unsubPartite = onSnapshot(q, (snap) => {
+    partiteCache = [];
+    snap.forEach((d) => partiteCache.push({ id: d.id, ...d.data() }));
+    renderPartite();
+  }, (err) => {
+    document.getElementById("listaPartite").innerHTML =
+      '<p class="motivo">Non riesco a leggere le partite (' + esc(err.code) + ').</p>';
+  });
+}
+
+function renderPartite(){
+  const cont = document.getElementById("listaPartite");
+  const conta = document.getElementById("contaPartite");
+  const limite = Date.now() - 3 * 60 * 60 * 1000; // dopo 3 ore la partita sparisce dalla lista
+  const viste = partiteCache
+    .filter((p) => { const t = new Date(p.quando).getTime(); return isNaN(t) || t > limite; })
+    .sort((a, b) => {
+      if (a.id === invitoId) return -1;
+      if (b.id === invitoId) return 1;
+      return String(a.quando).localeCompare(String(b.quando));
+    });
+
+  conta.textContent = viste.length ? viste.length + (viste.length === 1 ? " partita" : " partite") : "";
+
+  if (!viste.length){
+    cont.innerHTML = '<div class="next-box"><h2>Non c&#39;è ancora niente</h2>' +
+      '<p>Nessuno ha ancora messo una partita. Se hai il campo, mettila tu: chi è della tua fascia la vede e si iscrive.</p>' +
+      '<p>Perché una partita parta servono quattro giocatori dello stesso livello. In due non si gioca.</p></div>';
+    return;
+  }
+  cont.innerHTML = viste.map(cardPartita).join("");
+}
+
+function cardPartita(p){
+  const g = p.giocatori || [];
+  const mioUid = currentUser ? currentUser.uid : "";
+  const dentro = g.some((x) => x.uid === mioUid);
+  const piena = g.length >= POSTI;
+  const ok = passaIlCancello(p);
+  const media = mediaPartita(p);
+  const mia = p.creatoDa === mioUid;
+  const invitato = p.id === invitoId;
+
+  const pallini = [0, 1, 2, 3]
+    .map((i) => '<i class="pallino' + (i < g.length ? '' : ' vuoto') + '"></i>').join("");
+  const mancano = POSTI - g.length;
+  const testoPosti = piena
+    ? "Siete in quattro"
+    : (mancano === 1 ? "Manca uno" : "Mancano " + mancano);
+
+  let azione;
+  if (dentro){
+    azione = '<button class="btn btn-sm btn-out" data-esci="' + p.id + '">Esco</button>';
+  } else if (piena){
+    azione = '<button class="btn btn-sm btn-bloccato" disabled>Completa</button>';
+  } else if (!ok && !sonoAdmin()){
+    azione = '<button class="btn btn-sm btn-bloccato" data-bloccato="' + p.id + '">Fuori dalla tua fascia</button>';
+  } else {
+    azione = '<button class="btn btn-sm btn-primary" data-iscrivi="' + p.id + '">Mi iscrivo</button>';
+  }
+
+  const annulla = (mia || sonoAdmin())
+    ? '<button class="btn btn-sm btn-out" data-annulla="' + p.id + '">Annulla</button>' : '';
+
+  let motivo = "";
+  if (!ok && !dentro && !piena){
+    const miaFascia = ((userDocData || {}).valutazione || {}).fasciaNome || "";
+    motivo = '<p class="motivo">È una partita di fascia ' + esc(p.fasciaNome) +
+      ', tu sei ' + esc(miaFascia) + '. Toccala per segnalarmelo: se capita spesso, la fascia va allargata.</p>';
+    if (sonoAdmin()){
+      motivo = '<p class="motivo">Fuori fascia (tu sei ' + esc(miaFascia) +
+        '), ma come amministratore puoi iscriverti lo stesso.</p>';
+    }
+  }
+
+  return '<div class="card' + (dentro ? ' dentro' : '') + (invitato ? ' invito' : '') + '">' +
+    (invitato ? '<div class="badge-invito">Ti hanno invitato a questa partita.</div>' : '') +
+    '<div class="card-top">' +
+      '<div><p class="dove">' + esc(p.dove) + '</p>' +
+      '<p class="quando">' + esc(fmtQuando(p.quando)) + '</p></div>' +
+      '<span class="banda">' + esc(p.fasciaNome) + '</span>' +
+    '</div>' +
+    '<div class="posti"><span class="pallini">' + pallini + '</span>' +
+      '<span class="posti-testo">' + testoPosti +
+      (media !== null ? ' · livello medio ' + media.toFixed(1) : '') + '</span></div>' +
+    '<p class="giocatori">' + (g.length ? esc(g.map((x) => x.nome).join(" · ")) : "Ancora nessuno") + '</p>' +
+    '<div class="card-azioni">' + azione +
+      '<button class="btn btn-sm btn-out" data-invita="' + p.id + '">Invita</button>' + annulla +
+    '</div>' + motivo +
+  '</div>';
+}
+
+function trovaPartita(id){
+  return partiteCache.find((p) => p.id === id) || null;
+}
+
+function ioGiocatore(){
+  const v = (userDocData && userDocData.valutazione) || {};
+  return {
+    uid: currentUser.uid,
+    nome: (userDocData && userDocData.nome) || "",
+    valore: v.valore === undefined ? null : v.valore,
+    margineMin: v.margineMin || 0,
+    margineMax: v.margineMax || 0,
+  };
+}
+
+async function iscriviti(id){
+  const me = ioGiocatore();
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, "partite", id);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("Questa partita non c'è più.");
+    const p = snap.data();
+    const g = (p.giocatori || []).slice();
+    if (g.some((x) => x.uid === me.uid)) return;
+    if (g.length >= POSTI) throw new Error("Si è riempita un attimo prima di te.");
+    g.push(me);
+    tx.update(ref, { giocatori: g });
+  });
+}
+
+async function esci(id){
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, "partite", id);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const g = (snap.data().giocatori || []).filter((x) => x.uid !== currentUser.uid);
+    tx.update(ref, { giocatori: g });
+  });
+}
+
+// Registro dei tentativi bloccati: se il cancello impedisce più partite di
+// quante ne protegge, si vede dai numeri invece che dalle opinioni.
+async function registraBloccato(p){
+  try {
+    await setDoc(doc(db, "users", currentUser.uid), {
+      tentativiBloccati: arrayUnion({
+        partita: p.id,
+        fascia: p.fasciaNome || "",
+        quando: new Date().toISOString(),
+      }),
+    }, { merge: true });
+  } catch (e) { /* il registro non deve mai impedire l'uso dell'app */ }
+}
+
+async function invita(p){
+  const url = location.origin + location.pathname + "?p=" + p.id;
+  const testo = "Cerchiamo giocatori: " + p.dove + ", " + fmtQuando(p.quando) + ".";
+  try {
+    if (navigator.share){ await navigator.share({ title: "SCHIACCIO", text: testo, url }); return; }
+    await navigator.clipboard.writeText(url);
+    msgLista("Link della partita copiato — incollalo dove vuoi.");
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    msgLista(url);
+  }
+}
+
+document.getElementById("listaPartite").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const id = b.getAttribute("data-iscrivi") || b.getAttribute("data-esci") ||
+             b.getAttribute("data-invita") || b.getAttribute("data-annulla") ||
+             b.getAttribute("data-bloccato");
+  if (!id) return;
+  const p = trovaPartita(id);
+  if (!p) return;
+  msgLista("");
+  try {
+    if (b.hasAttribute("data-iscrivi")) { b.disabled = true; await iscriviti(id); }
+    else if (b.hasAttribute("data-esci")) { b.disabled = true; await esci(id); }
+    else if (b.hasAttribute("data-invita")) { await invita(p); }
+    else if (b.hasAttribute("data-bloccato")) {
+      await registraBloccato(p);
+      msgLista("Segnato. Se succede spesso vuol dire che le fasce sono troppo strette.");
+    }
+    else if (b.hasAttribute("data-annulla")) {
+      if (!confirm("Annullo questa partita? Chi si è iscritto non la vedrà più.")) return;
+      await updateDoc(doc(db, "partite", id), { stato: "annullata" });
+    }
+  } catch (e) {
+    msgLista(e && e.message ? e.message : "Non ha funzionato, riprova.");
+    b.disabled = false;
+  }
+});
+
+// ---------- CREA PARTITA ----------
+document.getElementById("btnNuovaPartita").addEventListener("click", () => {
+  const sel = document.getElementById("selFascia");
+  sel.innerHTML = FASCE.map((f, i) =>
+    '<option value="' + i + '">' + esc(f.nome) + " (" + esc(f.sub) + ")</option>").join("");
+  const v = (userDocData && userDocData.valutazione) || null;
+  if (v){
+    const mia = getFascia(v.valore);
+    const idx = FASCE.findIndex((f) => f.nome === mia.nome);
+    if (idx >= 0) sel.value = String(idx);
+  }
+  document.getElementById("inpDove").value = "";
+  document.getElementById("inpQuando").value = "";
+  document.getElementById("creaError").style.display = "none";
+  showScreen("screen-crea");
+});
+
+document.getElementById("btnAnnullaCrea").addEventListener("click", () => showScreen("screen-partite"));
+
+document.getElementById("btnCreaPartita").addEventListener("click", async (ev) => {
+  const err = document.getElementById("creaError");
+  const mostraErrore = (t) => { err.textContent = t; err.style.display = "block"; };
+  const dove = document.getElementById("inpDove").value.trim();
+  const quando = document.getElementById("inpQuando").value;
+  const f = FASCE[Number(document.getElementById("selFascia").value)];
+  err.style.display = "none";
+
+  if (!dove) return mostraErrore("Scrivi dove si gioca.");
+  if (!quando) return mostraErrore("Metti giorno e ora.");
+  if (new Date(quando).getTime() < Date.now() - 60 * 60 * 1000)
+    return mostraErrore("Quel giorno è già passato.");
+
+  const mio = mioIntervallo();
+  if (mio && !(mio.max >= f.min && mio.min <= f.max) && !sonoAdmin())
+    return mostraErrore("Questa fascia è fuori dal tuo livello: non potresti iscriverti alla partita che stai creando.");
+
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    await addDoc(collection(db, "partite"), {
+      dove: dove,
+      quando: quando,
+      fasciaMin: f.min,
+      fasciaMax: f.max,
+      fasciaNome: f.nome,
+      creatoDa: currentUser.uid,
+      creatoDaNome: (userDocData && userDocData.nome) || "",
+      stato: "aperta",
+      createdAt: serverTimestamp(),
+      giocatori: [ioGiocatore()],
+    });
+    showScreen("screen-partite");
+  } catch (e) {
+    mostraErrore("Non sono riuscito a creare la partita (" + (e.code || e.message) + ").");
+  } finally {
+    btn.disabled = false;
   }
 });
 </script>
