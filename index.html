@@ -244,7 +244,7 @@
     <section class="screen" id="screen-verdetto">
       <div class="scroll">
         <div class="verdict">
-          <div class="fascia-pill">In calibrazione</div>
+          <div class="fascia-pill" id="verdPill">In calibrazione</div>
           <div class="fascia-nome" id="verdFascia">—</div>
           <div class="fascia-sub" id="verdSub">—</div>
           <div class="badge-calib">
@@ -354,6 +354,7 @@ document.getElementById("btnSignout").addEventListener("click", () => signOut(au
 
 let currentUser = null;
 let userDocData = null;
+let unsubProfilo = null;
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
@@ -372,6 +373,21 @@ onAuthStateChanged(auth, async (user) => {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
   userDocData = snap.exists() ? snap.data() : null;
+
+  // resta in ascolto sul proprio profilo: quando Simone corregge un livello,
+  // il giocatore lo vede senza dover ricaricare la pagina
+  if (unsubProfilo) unsubProfilo();
+  unsubProfilo = onSnapshot(ref, (s2) => {
+    if (!s2.exists()) return;
+    userDocData = s2.data();
+    aggiornaChip();
+    if (document.getElementById("screen-verdetto").classList.contains("active")) {
+      mostraVerdetto(userDocData);
+    }
+    if (document.getElementById("screen-partite").classList.contains("active")) {
+      renderPartite();
+    }
+  });
 
   if (!userDocData || !userDocData.profiloCompletato) {
     prefillProfilo(user);
@@ -613,10 +629,12 @@ document.getElementById("btnAutoAvanti").addEventListener("click", async () => {
 
 // ---------- VERDETTO ----------
 function mostraVerdetto(data){
-  const v = data.valutazione || {};
-  document.getElementById("verdFascia").textContent = v.fasciaNome || "—";
-  document.getElementById("verdSub").textContent = v.fasciaSottotitolo || "—";
-  document.getElementById("verdReview").style.display = v.guardiaAttiva ? "block" : "none";
+  const l = livelloEffettivo(data) || {};
+  document.getElementById("verdFascia").textContent = l.fasciaNome || "—";
+  document.getElementById("verdSub").textContent = l.fasciaSottotitolo || "—";
+  document.getElementById("verdPill").textContent =
+    l.corretto ? "Controllato da Simone" : "In calibrazione";
+  document.getElementById("verdReview").style.display = l.guardiaAttiva ? "block" : "none";
   aggiornaChip();
 }
 // ---------- CONDIVIDI IL LINK ----------
@@ -658,13 +676,35 @@ function msgLista(testo){
   el.style.display = testo ? "block" : "none";
 }
 
-function mioIntervallo(){
-  const v = (userDocData && userDocData.valutazione) || null;
+// UNICA fonte di verita' del livello mostrato e usato dal cancello.
+// Nel pilota il metro e' Simone: se ha corretto a mano, vince la sua cifra.
+// Il margine resta quello del questionario: stringerlo qui bloccherebbe il
+// giocatore fuori dalle partite vicine, proprio mentre i giocatori scarseggiano.
+function livelloEffettivo(d){
+  const v = (d && d.valutazione) || null;
   if (!v) return null;
+  const rev = (d && d.revisione) || {};
+  const corretto = rev.valoreCorretto !== null && rev.valoreCorretto !== undefined;
+  const valore = corretto ? rev.valoreCorretto : v.valore;
+  const fascia = getFascia(valore);
   return {
-    valore: v.valore,
-    min: v.valore - (v.margineMin || 0),
-    max: v.valore + (v.margineMax || 0),
+    valore: valore,
+    margineMin: v.margineMin || 0,
+    margineMax: v.margineMax || 0,
+    fasciaNome: fascia.nome,
+    fasciaSottotitolo: fascia.sub,
+    corretto: corretto,
+    guardiaAttiva: !!v.guardiaAttiva && !corretto,
+  };
+}
+
+function mioIntervallo(){
+  const l = livelloEffettivo(userDocData);
+  if (!l) return null;
+  return {
+    valore: l.valore,
+    min: l.valore - l.margineMin,
+    max: l.valore + l.margineMax,
   };
 }
 
@@ -697,9 +737,9 @@ function mediaPartita(p){
 
 function aggiornaChip(){
   const chip = document.getElementById("chipFascia");
-  const v = (userDocData && userDocData.valutazione) || null;
-  if (!v){ chip.style.display = "none"; return; }
-  chip.textContent = v.fasciaNome;
+  const l = livelloEffettivo(userDocData);
+  if (!l){ chip.style.display = "none"; return; }
+  chip.textContent = l.fasciaNome;
   chip.style.display = "block";
 }
 
@@ -810,13 +850,13 @@ function trovaPartita(id){
 }
 
 function ioGiocatore(){
-  const v = (userDocData && userDocData.valutazione) || {};
+  const l = livelloEffettivo(userDocData) || {};
   return {
     uid: currentUser.uid,
     nome: (userDocData && userDocData.nome) || "",
-    valore: v.valore === undefined ? null : v.valore,
-    margineMin: v.margineMin || 0,
-    margineMax: v.margineMax || 0,
+    valore: l.valore === undefined ? null : l.valore,
+    margineMin: l.margineMin || 0,
+    margineMax: l.margineMax || 0,
   };
 }
 

@@ -66,6 +66,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, collection, getDocs, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { firebaseConfig, EMAIL_ADMIN } from "./firebase-config.js";
+import { getFascia } from "./conversione.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -118,16 +119,32 @@ async function caricaProfili(){
           : '') + '</td>' +
       '<td>' + fmtRisposte(d.risposte) + '</td>' +
       '<td><span class="pill">' + (v.strada || "—") + '</span>' + (v.guardiaAttiva ? '<br><span class="muted">⚠️ da ricontrollare</span>' : '') + '</td>' +
-      '<td><b>' + (v.valore ?? "—") + '</b><br><span class="muted">' + (v.fasciaNome || "") + '</span></td>' +
+      '<td><b>' + (v.valore ?? "—") + '</b><br><span class="muted">' + (v.fasciaNome || "") + '</span>' +
+        (rev.valoreCorretto != null
+          ? '<br><b>→ ' + rev.valoreCorretto + '</b><br><span class="muted">' +
+            getFascia(rev.valoreCorretto).nome + ' (tuo)</span>'
+          : '') + '</td>' +
       '<td>±' + (v.margineMin === v.margineMax ? v.margineMin : v.margineMin + "/" + v.margineMax) + '</td>' +
       '<td><div class="correzione">' +
-        '<input type="number" step="0.1" min="1" max="7" placeholder="' + (rev.valoreCorretto ?? "") + '" data-uid="' + docSnap.id + '">' +
+        '<input type="number" step="0.1" min="1" max="7" placeholder="es. 3.8" value="' + (rev.valoreCorretto ?? "") + '" data-uid="' + docSnap.id + '">' +
         '<button data-uid="' + docSnap.id + '">Salva</button>' +
+        (rev.valoreCorretto != null ? '<button data-togli="' + docSnap.id + '">Togli</button>' : '') +
       '</div></td>';
     tbody.appendChild(tr);
   });
 
-  tbody.querySelectorAll("button").forEach(btn => {
+  tbody.querySelectorAll("button[data-togli]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "users", btn.dataset.togli), {
+        "revisione.valoreCorretto": null,
+        "revisione.correttoDa": auth.currentUser.email,
+        "revisione.correttoAt": serverTimestamp(),
+      });
+      caricaProfili();
+    });
+  });
+
+  tbody.querySelectorAll("button[data-uid]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const uid = btn.dataset.uid;
       const input = tbody.querySelector('input[data-uid="' + uid + '"]');
@@ -138,8 +155,8 @@ async function caricaProfili(){
         "revisione.correttoDa": auth.currentUser.email,
         "revisione.correttoAt": serverTimestamp(),
       });
-      input.placeholder = val;
-      input.value = "";
+      input.value = val;
+      caricaProfili();
     });
   });
 }
