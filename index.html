@@ -152,6 +152,28 @@
   .motivo{font-size:12px; color:var(--warn); margin:9px 0 0; line-height:1.45;}
   .badge-invito{background:color-mix(in srgb, var(--ok) 16%, var(--surface)); border:1px solid var(--ok); color:var(--ink); border-radius:10px; padding:8px 12px; font-size:12.5px; margin-bottom:10px;}
 
+  /* --- (i) e pop-up delle spiegazioni --- */
+  .info{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:19px; height:19px; margin-left:6px; padding:0; flex:0 0 auto;
+    border-radius:50%; border:1.5px solid var(--muted); background:none;
+    color:var(--muted); font-size:12px; font-weight:800; font-style:italic;
+    line-height:1; cursor:pointer; vertical-align:middle;
+  }
+  .fascia-pill .info, .banda .info{border-color:currentColor; color:currentColor; width:16px; height:16px; font-size:10.5px;}
+  .modal-back{
+    position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.5);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-back.on{display:flex;}
+  .modal{
+    background:var(--surface); width:100%; max-width:430px;
+    border-radius:22px 22px 0 0; padding:24px 20px calc(20px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -10px 44px rgba(0,0,0,.35); max-height:80vh; overflow-y:auto;
+  }
+  .modal h3{margin:0 0 10px; font-size:18px;}
+  .modal p{margin:0 0 14px; font-size:14px; color:var(--muted); line-height:1.55;}
+
   .field-hint{font-size:12px; color:var(--muted); margin-top:6px; line-height:1.4;}
   .error-box{background:color-mix(in srgb, var(--coral) 12%, var(--surface)); border:1px solid var(--coral); color:var(--coral-ink); border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:16px;}
   .spinner{width:22px; height:22px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--coral); animation:spin 1s linear infinite;}
@@ -244,11 +266,11 @@
     <section class="screen" id="screen-verdetto">
       <div class="scroll">
         <div class="verdict">
-          <div class="fascia-pill" id="verdPill">In calibrazione</div>
-          <div class="fascia-nome" id="verdFascia">—</div>
+          <div class="fascia-pill"><span id="verdPill">In calibrazione</span><button class="info" id="verdPillInfo" data-info="calibrazione">i</button></div>
+          <div class="fascia-nome"><span id="verdFascia">—</span><button class="info" data-info="numero">i</button></div>
           <div class="fascia-sub" id="verdSub">—</div>
           <div class="badge-calib">
-            Questo è un punto di partenza, non un voto definitivo. Le prime partite lo correggono in fretta: il numero preciso arriva dopo, il margine si stringe partita dopo partita.
+            Questo è un punto di partenza, non un voto definitivo. Le prime partite lo correggono in fretta: il numero preciso arriva dopo, il margine si stringe partita dopo partita.<button class="info" data-info="margine">i</button>
           </div>
           <div class="note-review" id="verdReview" style="display:none;">
             ⚠️ Le tue risposte sono un po' contraddittorie tra loro — un compagno di Simone ricontrollerà a mano il tuo livello di partenza prima della prima partita.
@@ -272,7 +294,7 @@
     <section class="screen" id="screen-partite">
       <div class="scroll">
         <div class="list-head">
-          <h1>Partite in formazione</h1>
+          <h1>Partite in formazione<button class="info" data-info="come-partite">i</button></h1>
           <span class="count" id="contaPartite"></span>
         </div>
         <p id="listaMsg" class="motivo" style="display:none"></p>
@@ -297,7 +319,7 @@
         <label for="inpQuando">Quando</label>
         <input type="datetime-local" id="inpQuando">
 
-        <label for="selFascia">Fascia della partita</label>
+        <label for="selFascia">Fascia della partita<button class="info" data-info="fascia-partita">i</button></label>
         <select id="selFascia"></select>
         <p class="field-hint">Chi sta fuori da questa fascia non si può iscrivere. Resta fissa: non si sposta quando entrano gli altri.</p>
 
@@ -310,6 +332,15 @@
     </section>
 
   </main>
+
+  <!-- pop-up delle spiegazioni: il testo lo mette il codice, secondo la (i) toccata -->
+  <div class="modal-back" id="infoBack">
+    <div class="modal">
+      <h3 id="infoTitolo"></h3>
+      <div id="infoTesto"></div>
+      <button class="btn btn-primary" id="infoChiudi">Ho capito</button>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -530,7 +561,8 @@ function renderStep(){
   const d = attive[stepIndex];
   const area = document.getElementById("autoStepArea");
 
-  const numLabel = "Domanda " + (stepIndex + 1) + " di " + attive.length;
+  const numLabel = "Domanda " + (stepIndex + 1) + " di " + attive.length +
+    '<button class="info" data-info="questionario">i</button>';
 
   if (d.libera) {
     area.innerHTML =
@@ -634,6 +666,8 @@ function mostraVerdetto(data){
   document.getElementById("verdSub").textContent = l.fasciaSottotitolo || "—";
   document.getElementById("verdPill").textContent =
     l.corretto ? "Controllato da Simone" : "In calibrazione";
+  document.getElementById("verdPillInfo")
+    .setAttribute("data-info", l.corretto ? "controllato" : "calibrazione");
   document.getElementById("verdReview").style.display = l.guardiaAttiva ? "block" : "none";
   aggiornaChip();
 }
@@ -654,6 +688,107 @@ document.getElementById("btnCondividi").addEventListener("click", async () => {
     hint.textContent = url;
   }
 });
+// ---------- SPIEGAZIONI (le (i) sparse per l'app) ----------
+// Tutto quello che una persona puo' non sapere sta qui, e si legge solo se lo
+// chiede: le pagine restano pulite.
+const SPIEGAZIONI = {
+  calibrazione: {
+    titolo: "Che vuol dire «in calibrazione»",
+    testo: [
+      "Il livello che vedi è una stima di partenza, non un voto. Nasce da 6 domande, e le domande da sole sbagliano.",
+      "Le prime partite lo correggono in fretta: il sistema guarda com'è finita, contro chi, e come vi siete visti tra voi. Più giochi, più il livello diventa tuo davvero.",
+    ],
+  },
+  controllato: {
+    titolo: "Che vuol dire «controllato da Simone»",
+    testo: [
+      "Il tuo livello non è più solo quello calcolato dalle domande: Simone l'ha sistemato a mano.",
+      "In questa prima fase il metro è lui: il questionario serve a partire, ma chi vede giocare corregge meglio di sei domande.",
+    ],
+  },
+  numero: {
+    titolo: "Perché una fascia e non un numero",
+    testo: [
+      "Un numero preciso — tipo 3.4 — prometterebbe una precisione che oggi non abbiamo: nasce da un questionario, non dal campo. E non si muoverebbe di un decimale finché non giochi.",
+      "Il numero si sblocca quando te lo sei guadagnato: dopo qualche partita giocata. Da lì in poi si muove ogni volta che scendi in campo, ed è quello il momento in cui diventa interessante guardarlo.",
+    ],
+  },
+  margine: {
+    titolo: "Il margine di incertezza",
+    testo: [
+      "Ogni livello ha un margine: quanto potresti essere più forte o più debole di quanto dice la stima. All'inizio è largo, perché di te si sa poco.",
+      "Non è un difetto, è utile: con un margine largo entri anche nelle partite di confine, invece di restare fuori per un decimale. Si stringe partita dopo partita.",
+    ],
+  },
+  "come-partite": {
+    titolo: "Come nascono le partite",
+    testo: [
+      "Le partite le mette chi ha preso il campo: scrive dove e quando, sceglie la fascia e si iscrive per primo.",
+      "Gli altri si aggiungono da qui. Quando siete in quattro, si gioca: 2 contro 2. Se non si arriva a quattro, la partita si annulla e non hai speso niente.",
+      "Se hai già sentito qualcuno, usa «Invita»: gli arriva il link di quella partita e si iscrive con un tocco.",
+    ],
+  },
+  cancello: {
+    titolo: "La fascia della partita",
+    testo: [
+      "Ogni partita ha una fascia, decisa da chi l'ha creata, e non cambia più quando entrano gli altri.",
+      "Se il tuo livello è fuori da quella fascia non ti puoi iscrivere. Serve a evitare la serata in cui uno spacca e gli altri tre raccolgono palloni: è tutto il punto dell'app.",
+      "Se ti capita spesso di trovare partite fuori fascia, tocca il bottone: viene segnalato, e vuol dire che le fasce sono troppo strette.",
+    ],
+  },
+  posti: {
+    titolo: "I posti",
+    testo: [
+      "I pallini sono i quattro posti della partita: pieni quelli occupati, vuoti quelli liberi.",
+      "Finché non siete in quattro la partita non è confermata. Puoi uscire quando vuoi, ma se lo fai all'ultimo lasci gli altri in tre.",
+    ],
+  },
+  media: {
+    titolo: "Il livello medio",
+    testo: [
+      "È la media dei livelli di chi si è già iscritto: serve solo a farti capire chi troverai in campo.",
+      "Non decide niente: la porta d'ingresso resta la fascia scelta all'inizio, che non si sposta. Altrimenti chi si iscrive per primo si ritroverebbe in una partita diversa da quella a cui aveva detto sì.",
+    ],
+  },
+  questionario: {
+    titolo: "A cosa servono queste domande",
+    testo: [
+      "Sono sei domande, meno di un minuto. Non è un esame e non c'è una risposta giusta: servono solo a darti un punto di partenza.",
+      "Rispondi come giochi davvero, non come vorresti giocare: un livello gonfiato ti fa finire in partite in cui non ti diverti. E se sbagli una risposta, puoi rifare tutto quando vuoi.",
+    ],
+  },
+  "fascia-partita": {
+    titolo: "Quale fascia scegliere",
+    testo: [
+      "Di solito la tua: è quella in cui trovi gente con cui te la giochi alla pari.",
+      "La fascia resta fissa per tutta la vita della partita: chi è fuori non si può iscrivere, e chi entra sa già che livello troverà.",
+    ],
+  },
+};
+
+function apriInfo(chiave){
+  const s = SPIEGAZIONI[chiave];
+  if (!s) return;
+  document.getElementById("infoTitolo").textContent = s.titolo;
+  document.getElementById("infoTesto").innerHTML = s.testo.map((t) => "<p>" + esc(t) + "</p>").join("");
+  document.getElementById("infoBack").classList.add("on");
+}
+
+function chiudiInfo(){
+  document.getElementById("infoBack").classList.remove("on");
+}
+
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-info]");
+  if (!b) return;
+  ev.preventDefault();
+  apriInfo(b.getAttribute("data-info"));
+});
+document.getElementById("infoChiudi").addEventListener("click", chiudiInfo);
+document.getElementById("infoBack").addEventListener("click", (ev) => {
+  if (ev.target.id === "infoBack") chiudiInfo();   // tocco fuori dal riquadro
+});
+
 // ---------- PARTITE IN FORMAZIONE ----------
 const POSTI = 4;
 let partiteCache = [];
@@ -833,11 +968,13 @@ function cardPartita(p){
     '<div class="card-top">' +
       '<div><p class="dove">' + esc(p.dove) + '</p>' +
       '<p class="quando">' + esc(fmtQuando(p.quando)) + '</p></div>' +
-      '<span class="banda">' + esc(p.fasciaNome) + '</span>' +
+      '<span class="banda">' + esc(p.fasciaNome) + '<button class="info" data-info="cancello">i</button></span>' +
     '</div>' +
     '<div class="posti"><span class="pallini">' + pallini + '</span>' +
       '<span class="posti-testo">' + testoPosti +
-      (media !== null ? ' · livello medio ' + media.toFixed(1) : '') + '</span></div>' +
+      '<button class="info" data-info="posti">i</button>' +
+      (media !== null ? ' · livello medio ' + media.toFixed(1) +
+        '<button class="info" data-info="media">i</button>' : '') + '</span></div>' +
     '<p class="giocatori">' + (g.length ? esc(g.map((x) => x.nome).join(" · ")) : "Ancora nessuno") + '</p>' +
     '<div class="card-azioni">' + azione +
       '<button class="btn btn-sm btn-out" data-invita="' + p.id + '">Invita</button>' + annulla +
