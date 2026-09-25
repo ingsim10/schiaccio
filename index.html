@@ -152,6 +152,38 @@
   .motivo{font-size:12px; color:var(--warn); margin:9px 0 0; line-height:1.45;}
   .badge-invito{background:color-mix(in srgb, var(--ok) 16%, var(--surface)); border:1px solid var(--ok); color:var(--ink); border-radius:10px; padding:8px 12px; font-size:12.5px; margin-bottom:10px;}
 
+  /* --- il risultato: i set si scrivono a bordo campo, uno alla volta --- */
+  .sezione-titolo{font-size:11.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:2px 0 10px;}
+  .card.chiudere{border-color:var(--warn);}
+  .set-riga{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line);}
+  .set-riga:last-child{border-bottom:none;}
+  .set-testo{flex:1; font-size:13.5px; line-height:1.5;}
+  .set-punti{font-size:17px; font-weight:900; white-space:nowrap;}
+  .set-vinta{font-weight:800;}
+  .btn-icona{
+    border:1px solid var(--line); background:var(--surface); color:var(--muted);
+    border-radius:10px; padding:8px 11px; font-size:13px; cursor:pointer; flex:0 0 auto;
+  }
+  .nomi-griglia{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 4px;}
+  .nome-chip{
+    border:1.5px solid var(--line); background:var(--surface); color:var(--ink);
+    border-radius:999px; padding:11px 15px; font-size:14.5px; font-weight:700; cursor:pointer;
+  }
+  .nome-chip .lato{font-size:11px; font-weight:800; margin-left:6px; opacity:.85;}
+  .nome-chip.uno{border-color:var(--coral); background:color-mix(in srgb, var(--coral) 10%, var(--surface)); color:var(--coral-ink);}
+  .nome-chip.due{border-color:var(--blue); background:var(--blue-bg); color:var(--blue);}
+  .punti-riga{display:flex; align-items:center; gap:12px; margin:12px 0;}
+  .punti-riga .lato-nome{flex:1; font-size:14px; font-weight:700; line-height:1.4;}
+  .punti-riga input{
+    width:88px; box-sizing:border-box; padding:13px 8px; font-size:22px; font-weight:800;
+    text-align:center; border-radius:12px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink);
+  }
+  .riga-ospite{display:flex; gap:8px; align-items:center; margin-top:10px;}
+  .riga-ospite input[type=text]{flex:1 1 auto; width:auto; min-width:0; margin:0;}
+  .riga-ospite .btn{flex:0 0 auto; width:auto; padding:13px 18px; font-size:14px;}
+  .box-chiuso{background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:12.5px; color:var(--muted); line-height:1.5;}
+
   /* --- (i) e pop-up delle spiegazioni --- */
   .info{
     display:inline-flex; align-items:center; justify-content:center;
@@ -299,6 +331,7 @@
           <span class="count" id="contaPartite"></span>
         </div>
         <p id="listaMsg" class="motivo" style="display:none"></p>
+        <div id="daChiudere"></div>
         <div id="listaPartite"></div>
       </div>
       <div class="bottombar col">
@@ -337,6 +370,48 @@
       <div class="bottombar">
         <button class="btn btn-ghost" id="btnAnnullaCrea">Indietro</button>
         <button class="btn btn-primary" id="btnCreaPartita">Crea e iscrivimi</button>
+      </div>
+    </section>
+
+    <!-- ============ SCHERMATA: IL RISULTATO ============ -->
+    <!-- Una partita = un elenco di set, ognuno con le sue due coppie e il suo
+         punteggio. Il formato (coppie fisse, king, misto) non si dichiara: si
+         deduce da qui. Si scrive a fine di ogni set, a bordo campo. -->
+    <section class="screen" id="screen-risultato">
+      <div class="scroll">
+        <h1>Il risultato</h1>
+        <p class="lead" id="risIntestazione">—</p>
+
+        <div id="risSetScritti"></div>
+
+        <div id="risForm">
+          <label id="risEtichettaSet">Il primo set</label>
+          <p class="field-hint">Tocca i nomi: al primo tocco vanno nella coppia 1, al secondo nella coppia 2.</p>
+          <div class="nomi-griglia" id="risNomi"></div>
+
+          <div class="riga-ospite">
+            <input type="text" id="risNuovoNome" placeholder="Chi ha giocato senza l'app">
+            <button class="btn btn-out" id="risAggiungiNome">Aggiungi</button>
+          </div>
+
+          <div class="punti-riga">
+            <span class="lato-nome" id="risNomiUno">Coppia 1</span>
+            <input type="number" id="risPuntiUno" inputmode="numeric" min="0" max="99" placeholder="0">
+          </div>
+          <div class="punti-riga">
+            <span class="lato-nome" id="risNomiDue">Coppia 2</span>
+            <input type="number" id="risPuntiDue" inputmode="numeric" min="0" max="99" placeholder="0">
+          </div>
+
+          <div id="risErrore" class="error-box" style="display:none; margin-top:10px;"></div>
+          <p class="field-hint">Le correzioni restano aperte fino a mezzanotte.</p>
+        </div>
+
+        <div id="risChiuso" class="box-chiuso" style="display:none"></div>
+      </div>
+      <div class="bottombar">
+        <button class="btn btn-ghost" id="risIndietro">Indietro</button>
+        <button class="btn btn-primary" id="risSalvaSet">Salva il set</button>
       </div>
     </section>
 
@@ -924,11 +999,29 @@ function apriPartite(){
   });
 }
 
+// Le partite già giocate non spariscono più in silenzio: se hai giocato tu,
+// restano in cima col bottone per scrivere il risultato. Senza questo, la
+// partita si dissolve tre ore dopo e i punteggi non li scrive nessuno.
+function sonoDentro(p){
+  const uid = currentUser ? currentUser.uid : "";
+  return p.creatoDa === uid || (p.giocatori || []).some((x) => x.uid === uid);
+}
+
+function daScrivere(p){
+  if (!sonoDentro(p)) return false;
+  const t = new Date(p.quando).getTime();
+  if (isNaN(t)) return false;
+  const ora = Date.now();
+  return t <= ora && t > ora - 7 * 24 * 60 * 60 * 1000;
+}
+
 function renderPartite(){
+  renderDaChiudere();
   const cont = document.getElementById("listaPartite");
   const conta = document.getElementById("contaPartite");
   const limite = Date.now() - 3 * 60 * 60 * 1000; // dopo 3 ore la partita sparisce dalla lista
   const viste = partiteCache
+    .filter((p) => !daScrivere(p))
     .filter((p) => { const t = new Date(p.quando).getTime(); return isNaN(t) || t > limite; })
     .sort((a, b) => {
       if (a.id === invitoId) return -1;
@@ -945,7 +1038,317 @@ function renderPartite(){
     return;
   }
   cont.innerHTML = viste.map(cardPartita).join("");
+  aggiornaRisultatoSeAperto();
 }
+
+function renderDaChiudere(){
+  const cont = document.getElementById("daChiudere");
+  const viste = partiteCache
+    .filter(daScrivere)
+    .sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+  if (!viste.length){ cont.innerHTML = ""; return; }
+  cont.innerHTML = '<p class="sezione-titolo">Hai giocato</p>' +
+    viste.map(cardDaChiudere).join("");
+}
+
+function cardDaChiudere(p){
+  const n = (p.set || []).length;
+  const righe = n
+    ? '<p class="giocatori">' + n + (n === 1 ? " set scritto" : " set scritti") + ": " +
+      esc((p.set || []).map((s) => s.puntiUno + "-" + s.puntiDue).join(" · ")) + '</p>'
+    : '<p class="giocatori">Nessun set scritto. Bastano i nomi e i punteggi.</p>';
+  return '<div class="card chiudere">' +
+    '<div class="card-top"><div>' +
+      '<p class="dove">' + esc(p.dove) + '</p>' +
+      '<p class="quando">' + esc(fmtQuando(p.quando)) + '</p>' +
+    '</div></div>' +
+    righe +
+    '<div class="card-azioni">' +
+      '<button class="btn btn-sm btn-primary" data-risultato="' + p.id + '">' +
+        (n ? "Apri il risultato" : "Scrivi il risultato") + '</button>' +
+    '</div></div>';
+}
+
+document.getElementById("daChiudere").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-risultato]");
+  if (b) apriRisultato(b.getAttribute("data-risultato"));
+});
+
+// ---------- IL RISULTATO ----------
+// Un set alla volta, scritto a bordo campo. Chi non ha l'app si aggiunge come
+// nome scritto a mano: alla prima serata gli altri tre non ce l'hanno, e senza
+// questo la partita non si potrebbe registrare affatto.
+let risultatoId = "";
+let risSelezione = {};     // chiave persona -> 1 oppure 2
+let risOspiti = [];        // nomi aggiunti a mano, non ancora per forza salvati
+let risInModifica = -1;    // -1 = sto scrivendo un set nuovo
+
+function chiavePersona(pers){
+  return pers.uid ? ("u:" + pers.uid) : ("o:" + pers.nome);
+}
+
+function personePartita(p){
+  const reg = (p.giocatori || []).map((g) => ({ uid: g.uid, nome: g.nome || "Senza nome" }));
+  const osp = (p.ospiti || []).concat(risOspiti.filter((n) => !(p.ospiti || []).includes(n)))
+    .map((n) => ({ uid: null, nome: n }));
+  return reg.concat(osp);
+}
+
+function mezzanotteDopo(quando){
+  const d = new Date(quando);
+  if (isNaN(d.getTime())) return Infinity;
+  d.setHours(24, 0, 0, 0);
+  return d.getTime();
+}
+
+// Fino a mezzanotte si scrive e si corregge. Se però non ha scritto nessuno,
+// la partita resta aperta una settimana: meglio un punteggio in ritardo che
+// una serata persa.
+function risultatoScrivibile(p){
+  const ora = Date.now();
+  if (ora < mezzanotteDopo(p.quando)) return true;
+  return !(p.set || []).length && daScrivere(p);
+}
+
+function nomiLato(set, lato){
+  return (lato === 1 ? set.uno : set.due).map((x) => x.nome).join(" + ");
+}
+
+function apriRisultato(id){
+  risultatoId = id;
+  risSelezione = {};
+  risOspiti = [];
+  risInModifica = -1;
+  const p = trovaPartita(id);
+  if (p) proponiCoppieUltimoSet(p);
+  renderRisultato();
+  showScreen("screen-risultato");
+}
+
+// Caso più frequente: le coppie restano quelle. Si ripropongono già scelte, e
+// chi ha girato le cambia con due tocchi.
+function proponiCoppieUltimoSet(p){
+  const set = (p.set || [])[(p.set || []).length - 1];
+  if (!set) return;
+  set.uno.forEach((x) => { risSelezione[chiavePersona(x)] = 1; });
+  set.due.forEach((x) => { risSelezione[chiavePersona(x)] = 2; });
+}
+
+function renderRisultato(){
+  const p = trovaPartita(risultatoId);
+  if (!p){ showScreen("screen-partite"); return; }
+  document.getElementById("risIntestazione").textContent =
+    p.dove + " · " + fmtQuando(p.quando);
+  renderSetScritti(p);
+  renderFormRisultato(p);
+}
+
+function renderSetScritti(p){
+  const cont = document.getElementById("risSetScritti");
+  const set = p.set || [];
+  const apribile = risultatoScrivibile(p);
+  if (!set.length){ cont.innerHTML = ""; return; }
+  cont.innerHTML = '<p class="sezione-titolo">' +
+      (set.length === 1 ? "Un set scritto" : set.length + " set scritti") + '</p>' +
+    '<div class="card">' + set.map((s, i) => {
+      const unoVince = Number(s.puntiUno) > Number(s.puntiDue);
+      return '<div class="set-riga">' +
+        '<div class="set-testo">' +
+          '<span class="' + (unoVince ? "set-vinta" : "") + '">' + esc(nomiLato(s, 1)) + '</span>' +
+          ' contro ' +
+          '<span class="' + (unoVince ? "" : "set-vinta") + '">' + esc(nomiLato(s, 2)) + '</span>' +
+        '</div>' +
+        '<div class="set-punti">' + esc(s.puntiUno) + '-' + esc(s.puntiDue) + '</div>' +
+        (apribile
+          ? '<button class="btn-icona" data-correggi="' + i + '" title="Correggi">✎</button>' +
+            '<button class="btn-icona" data-elimina="' + i + '" title="Cancella">✕</button>'
+          : '') +
+      '</div>';
+    }).join("") + '</div>';
+}
+
+function renderFormRisultato(p){
+  const form = document.getElementById("risForm");
+  const chiuso = document.getElementById("risChiuso");
+  if (!risultatoScrivibile(p)){
+    form.style.display = "none";
+    document.getElementById("risSalvaSet").style.display = "none";
+    chiuso.style.display = "block";
+    chiuso.textContent = "Questa partita è chiusa: le correzioni restavano aperte fino a mezzanotte.";
+    return;
+  }
+  form.style.display = "block";
+  document.getElementById("risSalvaSet").style.display = "block";
+  chiuso.style.display = "none";
+
+  const n = (p.set || []).length;
+  document.getElementById("risEtichettaSet").textContent = risInModifica >= 0
+    ? "Correggi il set " + (risInModifica + 1)
+    : (n === 0 ? "Il primo set" : "Il set numero " + (n + 1));
+  document.getElementById("risSalvaSet").textContent = risInModifica >= 0
+    ? "Salva la correzione" : "Salva il set";
+
+  const persone = personePartita(p);
+  document.getElementById("risNomi").innerHTML = persone.map((pers) => {
+    const k = chiavePersona(pers);
+    const lato = risSelezione[k];
+    const cls = lato === 1 ? " uno" : (lato === 2 ? " due" : "");
+    const eti = lato ? '<span class="lato">coppia ' + lato + '</span>' : "";
+    return '<button class="nome-chip' + cls + '" data-persona="' + esc(k) + '">' +
+      esc(pers.nome) + eti + '</button>';
+  }).join("");
+
+  const uno = persone.filter((x) => risSelezione[chiavePersona(x)] === 1);
+  const due = persone.filter((x) => risSelezione[chiavePersona(x)] === 2);
+  document.getElementById("risNomiUno").textContent =
+    uno.length ? uno.map((x) => x.nome).join(" + ") : "Coppia 1";
+  document.getElementById("risNomiDue").textContent =
+    due.length ? due.map((x) => x.nome).join(" + ") : "Coppia 2";
+}
+
+function aggiornaRisultatoSeAperto(){
+  if (!document.getElementById("screen-risultato").classList.contains("active")) return;
+  const p = trovaPartita(risultatoId);
+  if (p) renderSetScritti(p);
+}
+
+document.getElementById("risNomi").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-persona]");
+  if (!b) return;
+  const k = b.getAttribute("data-persona");
+  // tre stati in ciclo: coppia 1 → coppia 2 → fuori dal set
+  const ora = risSelezione[k];
+  if (ora === 1) risSelezione[k] = 2;
+  else if (ora === 2) delete risSelezione[k];
+  else risSelezione[k] = 1;
+  const p = trovaPartita(risultatoId);
+  if (p) renderFormRisultato(p);
+});
+
+document.getElementById("risAggiungiNome").addEventListener("click", () => {
+  const inp = document.getElementById("risNuovoNome");
+  const nome = inp.value.trim();
+  if (!nome) return;
+  const p = trovaPartita(risultatoId);
+  if (!p) return;
+  const esiste = personePartita(p).some((x) => x.nome.toLowerCase() === nome.toLowerCase());
+  if (esiste){ mostraErroreRis("Questo nome c'è già."); return; }
+  risOspiti.push(nome);
+  inp.value = "";
+  mostraErroreRis("");
+  renderFormRisultato(p);
+});
+
+document.getElementById("risSetScritti").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const p = trovaPartita(risultatoId);
+  if (!p) return;
+  const iCor = b.getAttribute("data-correggi");
+  const iDel = b.getAttribute("data-elimina");
+  if (iCor !== null){
+    const s = (p.set || [])[Number(iCor)];
+    if (!s) return;
+    risInModifica = Number(iCor);
+    risSelezione = {};
+    s.uno.forEach((x) => { risSelezione[chiavePersona(x)] = 1; });
+    s.due.forEach((x) => { risSelezione[chiavePersona(x)] = 2; });
+    document.getElementById("risPuntiUno").value = s.puntiUno;
+    document.getElementById("risPuntiDue").value = s.puntiDue;
+    renderRisultato();
+    document.getElementById("risEtichettaSet").scrollIntoView({ behavior: "smooth", block: "center" });
+  } else if (iDel !== null){
+    if (!confirm("Cancello questo set?")) return;
+    b.disabled = true;
+    try { await salvaSet(Number(iDel), null); }
+    catch (e) { mostraErroreRis(messaggioErrore(e)); }
+    finally { b.disabled = false; }
+  }
+});
+
+function mostraErroreRis(t){
+  const el = document.getElementById("risErrore");
+  el.textContent = t;
+  el.style.display = t ? "block" : "none";
+}
+
+function messaggioErrore(e){
+  const c = (e && (e.code || e.message)) || "errore";
+  if (String(c).includes("permission-denied"))
+    return "Firebase non mi lascia scrivere il risultato (permission-denied): vanno ripubblicate le regole.";
+  return "Non sono riuscito a salvare (" + c + ").";
+}
+
+// indice = posizione del set; nuovo = null per cancellarlo
+async function salvaSet(indice, nuovo){
+  const id = risultatoId;
+  const ospitiDaSalvare = risOspiti.slice();
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, "partite", id);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("Questa partita non c'è più.");
+    const p = snap.data();
+    const arr = (p.set || []).slice();
+    if (nuovo === null) arr.splice(indice, 1);
+    else if (indice >= 0) arr[indice] = nuovo;
+    else arr.push(nuovo);
+
+    const patch = { set: arr, ultimaModifica: new Date().toISOString() };
+    const ospiti = (p.ospiti || []).slice();
+    ospitiDaSalvare.forEach((n) => { if (!ospiti.includes(n)) ospiti.push(n); });
+    if (ospiti.length !== (p.ospiti || []).length) patch.ospiti = ospiti;
+    // il primo che scrive resta scritto: serve per la regola della maggioranza
+    if (!p.risultatoDa){
+      patch.risultatoDa = currentUser.uid;
+      patch.risultatoDaNome = (userDocData && userDocData.nome) || "";
+    }
+    tx.update(ref, patch);
+  });
+}
+
+document.getElementById("risSalvaSet").addEventListener("click", async (ev) => {
+  const p = trovaPartita(risultatoId);
+  if (!p) return;
+  mostraErroreRis("");
+  const persone = personePartita(p);
+  const uno = persone.filter((x) => risSelezione[chiavePersona(x)] === 1);
+  const due = persone.filter((x) => risSelezione[chiavePersona(x)] === 2);
+  if (uno.length !== 2 || due.length !== 2)
+    return mostraErroreRis("Servono due nomi per coppia: tocca i nomi finché non sono due e due.");
+
+  const pu = document.getElementById("risPuntiUno").value.trim();
+  const pd = document.getElementById("risPuntiDue").value.trim();
+  if (pu === "" || pd === "") return mostraErroreRis("Scrivi tutti e due i punteggi.");
+  const nu = Number(pu), nd = Number(pd);
+  if (!Number.isInteger(nu) || !Number.isInteger(nd) || nu < 0 || nd < 0)
+    return mostraErroreRis("I punteggi sono numeri interi.");
+  if (nu === nd) return mostraErroreRis("Un set non finisce in parità.");
+
+  const nuovo = {
+    uno: uno.map((x) => ({ uid: x.uid, nome: x.nome })),
+    due: due.map((x) => ({ uid: x.uid, nome: x.nome })),
+    puntiUno: nu,
+    puntiDue: nd,
+    scrittoDa: currentUser.uid,
+    scrittoAt: new Date().toISOString(),
+  };
+
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    await salvaSet(risInModifica, nuovo);
+    risInModifica = -1;
+    document.getElementById("risPuntiUno").value = "";
+    document.getElementById("risPuntiDue").value = "";
+    renderRisultato();
+  } catch (e) {
+    mostraErroreRis(messaggioErrore(e));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("risIndietro").addEventListener("click", () => showScreen("screen-partite"));
 
 function cardPartita(p){
   const g = p.giocatori || [];
@@ -1053,7 +1456,7 @@ async function iscriviti(id){
       throw new Error("I posti per il tuo lato della coppia sono finiti.");
     }
     g.push(me);
-    tx.update(ref, { giocatori: g });
+    tx.update(ref, { giocatori: g, uids: g.map((x) => x.uid) });
   });
 }
 
@@ -1063,7 +1466,7 @@ async function esci(id){
     const snap = await tx.get(ref);
     if (!snap.exists()) return;
     const g = (snap.data().giocatori || []).filter((x) => x.uid !== currentUser.uid);
-    tx.update(ref, { giocatori: g });
+    tx.update(ref, { giocatori: g, uids: g.map((x) => x.uid) });
   });
 }
 
@@ -1190,6 +1593,10 @@ document.getElementById("btnCreaPartita").addEventListener("click", async (ev) =
       stato: "aperta",
       createdAt: serverTimestamp(),
       giocatori: [ioGiocatore()],
+      // elenco piatto degli iscritti: le regole di Firebase non sanno guardare
+      // dentro `giocatori`, e serve per lasciar scrivere il risultato a chi ha
+      // giocato (e a nessun altro)
+      uids: [currentUser.uid],
     });
     showScreen("screen-partite");
   } catch (e) {

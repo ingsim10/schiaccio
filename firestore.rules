@@ -18,7 +18,15 @@ service cloud.firestore {
       // fare chiunque sia dentro l'app. Cambiare il resto (annullare, spostare
       // la fascia) resta a chi ha creato la partita e all'amministratore.
       allow update: if request.auth != null && (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['giocatori'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['giocatori', 'uids'])
+        // Il risultato lo scrive e lo corregge chi ha giocato quella partita:
+        // il primo scrive, gli altri correggono. `uids` e' l'elenco piatto
+        // degli iscritti, perche' qui dentro `giocatori` non si sa guardare.
+        || (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['set', 'ospiti', 'risultatoDa', 'risultatoDaNome', 'ultimaModifica'])
+          && request.auth.uid in resource.data.uids
+        )
         || resource.data.creatoDa == request.auth.uid
         || request.auth.token.email == "simone.frattaioli@gmail.com"
       );
