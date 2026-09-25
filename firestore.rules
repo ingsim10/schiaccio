@@ -25,6 +25,7 @@ service cloud.firestore {
         || (
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['set', 'ospiti', 'risultatoDa', 'risultatoDaNome', 'ultimaModifica'])
+          && 'uids' in resource.data
           && request.auth.uid in resource.data.uids
         )
         || resource.data.creatoDa == request.auth.uid
