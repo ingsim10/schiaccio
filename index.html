@@ -405,7 +405,7 @@
           </div>
 
           <div id="risCombiBox">
-            <p class="field-hint">Chi stava con chi?</p>
+            <p class="field-hint" id="risCombiTesto">Chi stava con chi?</p>
             <div id="risCombinazioni"></div>
           </div>
 
@@ -1275,16 +1275,41 @@ function renderFormRisultato(p){
 
   combiBox.style.display = "block";
   cont.dataset.combi = JSON.stringify(combi);
-  cont.innerHTML = combi.map((c, i) => {
-    const scelta = stesseCoppie(c, risCoppie) ? " scelta" : "";
-    const eti = stesseCoppie(c, precedente)
-      ? '<span class="eti">come il set prima</span>' : "";
-    return '<button class="combi' + scelta + '" data-combi="' + i + '">' +
-      '<b>' + esc(nomeDi(c.uno[0])) + ' + ' + esc(nomeDi(c.uno[1])) + '</b>' +
-      '<span class="contro"> contro </span>' +
-      '<b>' + esc(nomeDi(c.due[0])) + ' + ' + esc(nomeDi(c.due[1])) + '</b>' +
-      eti + '</button>';
-  }).join("");
+
+  // Se chi scrive era in campo, la domanda facile e' una sola: con chi giocavi?
+  // Tre nomi da leggere invece di dodici (idea di Simone, 26/09). Quando invece
+  // scrive un set che non ha giocato - si gira in cinque, oppure corregge il
+  // set di altri - tornano le tre combinazioni, che valgono sempre.
+  const io = "u:" + (currentUser ? currentUser.uid : "");
+  if (risPresenti.includes(io)){
+    const altri = risPresenti.filter((k) => k !== io);
+    const compagnoPrecedente = precedente
+      ? (precedente.uno.includes(io) ? precedente.uno : precedente.due).find((k) => k !== io)
+      : null;
+    const mioCompagno = risCoppie
+      ? (risCoppie.uno.includes(io) ? risCoppie.uno : risCoppie.due).find((k) => k !== io)
+      : null;
+    document.getElementById("risCombiTesto").textContent = "Con chi giocavi?";
+    cont.innerHTML = altri.map((k) => {
+      const scelta = k === mioCompagno ? " scelta" : "";
+      const eti = k === compagnoPrecedente
+        ? '<span class="eti">come il set prima</span>' : "";
+      return '<button class="combi' + scelta + '" data-compagno="' + esc(k) + '">' +
+        '<b>' + esc(nomeDi(k)) + '</b>' + eti + '</button>';
+    }).join("");
+  } else {
+    document.getElementById("risCombiTesto").textContent = "Chi stava con chi?";
+    cont.innerHTML = combi.map((c, i) => {
+      const scelta = stesseCoppie(c, risCoppie) ? " scelta" : "";
+      const eti = stesseCoppie(c, precedente)
+        ? '<span class="eti">come il set prima</span>' : "";
+      return '<button class="combi' + scelta + '" data-combi="' + i + '">' +
+        '<b>' + esc(nomeDi(c.uno[0])) + ' + ' + esc(nomeDi(c.uno[1])) + '</b>' +
+        '<span class="contro"> contro </span>' +
+        '<b>' + esc(nomeDi(c.due[0])) + ' + ' + esc(nomeDi(c.due[1])) + '</b>' +
+        eti + '</button>';
+    }).join("");
+  }
 
   // i punteggi compaiono quando si sa di chi sono
   if (!risCoppie){ punteggi.style.display = "none"; return; }
@@ -1312,10 +1337,19 @@ document.getElementById("risNomi").addEventListener("click", (ev) => {
 });
 
 document.getElementById("risCombinazioni").addEventListener("click", (ev) => {
-  const b = ev.target.closest("button[data-combi]");
+  const b = ev.target.closest("button[data-combi], button[data-compagno]");
   if (!b) return;
-  const combi = JSON.parse(ev.currentTarget.dataset.combi || "[]");
-  risCoppie = combi[Number(b.getAttribute("data-combi"))] || null;
+  const compagno = b.getAttribute("data-compagno");
+  if (compagno){
+    const io = "u:" + (currentUser ? currentUser.uid : "");
+    risCoppie = {
+      uno: [io, compagno],
+      due: risPresenti.filter((k) => k !== io && k !== compagno),
+    };
+  } else {
+    const combi = JSON.parse(ev.currentTarget.dataset.combi || "[]");
+    risCoppie = combi[Number(b.getAttribute("data-combi"))] || null;
+  }
   const p = trovaPartita(risultatoId);
   if (p) renderFormRisultato(p);
 });
