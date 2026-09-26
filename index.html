@@ -170,8 +170,17 @@
     border-radius:999px; padding:11px 15px; font-size:14.5px; font-weight:700; cursor:pointer;
   }
   .nome-chip .lato{font-size:11px; font-weight:800; margin-left:6px; opacity:.85;}
-  .nome-chip.uno{border-color:var(--coral); background:color-mix(in srgb, var(--coral) 10%, var(--surface)); color:var(--coral-ink);}
-  .nome-chip.due{border-color:var(--blue); background:var(--blue-bg); color:var(--blue);}
+  .nome-chip.scelto{border-color:var(--coral); background:color-mix(in srgb, var(--coral) 10%, var(--surface)); color:var(--coral-ink);}
+  .combi{
+    display:block; width:100%; text-align:left; margin-bottom:10px; cursor:pointer;
+    border:1.5px solid var(--line); background:var(--surface); color:var(--ink);
+    border-radius:14px; padding:13px 15px; font-size:15px; line-height:1.45;
+  }
+  .combi b{font-weight:800;}
+  .combi .contro{color:var(--muted); font-weight:600; font-size:13px;}
+  .combi .eti{display:block; margin-top:5px; font-size:11.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);}
+  .combi.scelta{border-color:var(--coral); background:color-mix(in srgb, var(--coral) 8%, var(--surface));}
+  .combi.scelta .eti{color:var(--coral-ink);}
   .punti-riga{display:flex; align-items:center; gap:12px; margin:12px 0;}
   .punti-riga .lato-nome{flex:1; font-size:14px; font-weight:700; line-height:1.4;}
   .punti-riga input{
@@ -386,21 +395,35 @@
 
         <div id="risForm">
           <label id="risEtichettaSet">Il primo set</label>
-          <p class="field-hint">Tocca i nomi: al primo tocco vanno nella coppia 1, al secondo nella coppia 2.</p>
-          <div class="nomi-griglia" id="risNomi"></div>
 
+          <!-- Con quattro giocatori le coppie possibili sono solo tre: non si
+               compongono, si scelgono. Se in campo girano in più di quattro,
+               prima si dice chi ha giocato quel set. -->
+          <div id="risPresentiBox">
+            <p class="field-hint" id="risPresentiTesto">Chi ha giocato questo set?</p>
+            <div class="nomi-griglia" id="risNomi"></div>
+          </div>
+
+          <div id="risCombiBox">
+            <p class="field-hint">Chi stava con chi?</p>
+            <div id="risCombinazioni"></div>
+          </div>
+
+          <div id="risPunteggi">
+            <div class="punti-riga">
+              <span class="lato-nome" id="risNomiUno">Coppia 1</span>
+              <input type="number" id="risPuntiUno" inputmode="numeric" min="0" max="99" placeholder="0">
+            </div>
+            <div class="punti-riga">
+              <span class="lato-nome" id="risNomiDue">Coppia 2</span>
+              <input type="number" id="risPuntiDue" inputmode="numeric" min="0" max="99" placeholder="0">
+            </div>
+          </div>
+
+          <p class="field-hint" style="margin-top:16px;">Manca qualcuno? Chi ha giocato senza l'app si scrive qui.</p>
           <div class="riga-ospite">
             <input type="text" id="risNuovoNome" placeholder="Chi ha giocato senza l'app">
             <button class="btn btn-out" id="risAggiungiNome">Aggiungi</button>
-          </div>
-
-          <div class="punti-riga">
-            <span class="lato-nome" id="risNomiUno">Coppia 1</span>
-            <input type="number" id="risPuntiUno" inputmode="numeric" min="0" max="99" placeholder="0">
-          </div>
-          <div class="punti-riga">
-            <span class="lato-nome" id="risNomiDue">Coppia 2</span>
-            <input type="number" id="risPuntiDue" inputmode="numeric" min="0" max="99" placeholder="0">
           </div>
 
           <div id="risErrore" class="error-box" style="display:none; margin-top:10px;"></div>
@@ -1081,9 +1104,31 @@ document.getElementById("daChiudere").addEventListener("click", (ev) => {
 // nome scritto a mano: alla prima serata gli altri tre non ce l'hanno, e senza
 // questo la partita non si potrebbe registrare affatto.
 let risultatoId = "";
-let risSelezione = {};     // chiave persona -> 1 oppure 2
+let risPresenti = [];      // chiavi delle 4 persone che hanno giocato il set
+let risCoppie = null;      // { uno: [chiave, chiave], due: [chiave, chiave] }
 let risOspiti = [];        // nomi aggiunti a mano, non ancora per forza salvati
 let risInModifica = -1;    // -1 = sto scrivendo un set nuovo
+
+// Con quattro giocatori i modi di dividerli in due coppie sono SOLO TRE. Le
+// coppie non si compongono: si riconosce quella che era in campo. Nel King
+// quelle tre righe sono anche i tre set del giro chiuso.
+function combinazioniDi(q){
+  return [
+    { uno: [q[0], q[1]], due: [q[2], q[3]] },
+    { uno: [q[0], q[2]], due: [q[1], q[3]] },
+    { uno: [q[0], q[3]], due: [q[1], q[2]] },
+  ];
+}
+
+function stessoInsieme(a, b){
+  return a.length === b.length && a.every((k) => b.includes(k));
+}
+
+function stesseCoppie(c1, c2){
+  if (!c1 || !c2) return false;
+  return (stessoInsieme(c1.uno, c2.uno) && stessoInsieme(c1.due, c2.due))
+      || (stessoInsieme(c1.uno, c2.due) && stessoInsieme(c1.due, c2.uno));
+}
 
 function chiavePersona(pers){
   return pers.uid ? ("u:" + pers.uid) : ("o:" + pers.nome);
@@ -1110,7 +1155,8 @@ function nomiLato(set, lato){
 
 function apriRisultato(id){
   risultatoId = id;
-  risSelezione = {};
+  risPresenti = [];
+  risCoppie = null;
   risOspiti = [];
   risInModifica = -1;
   const p = trovaPartita(id);
@@ -1119,13 +1165,15 @@ function apriRisultato(id){
   showScreen("screen-risultato");
 }
 
-// Caso più frequente: le coppie restano quelle. Si ripropongono già scelte, e
-// chi ha girato le cambia con due tocchi.
+// Caso più frequente: gioca la stessa gente e restano le stesse coppie. Si
+// riparte da lì; chi ha girato tocca un'altra riga.
 function proponiCoppieUltimoSet(p){
   const set = (p.set || [])[(p.set || []).length - 1];
   if (!set) return;
-  set.uno.forEach((x) => { risSelezione[chiavePersona(x)] = 1; });
-  set.due.forEach((x) => { risSelezione[chiavePersona(x)] = 2; });
+  const uno = set.uno.map(chiavePersona);
+  const due = set.due.map(chiavePersona);
+  risPresenti = uno.concat(due);
+  risCoppie = { uno: uno, due: due };
 }
 
 function renderRisultato(){
@@ -1183,21 +1231,66 @@ function renderFormRisultato(p){
     ? "Salva la correzione" : "Salva il set";
 
   const persone = personePartita(p);
-  document.getElementById("risNomi").innerHTML = persone.map((pers) => {
-    const k = chiavePersona(pers);
-    const lato = risSelezione[k];
-    const cls = lato === 1 ? " uno" : (lato === 2 ? " due" : "");
-    const eti = lato ? '<span class="lato">coppia ' + lato + '</span>' : "";
-    return '<button class="nome-chip' + cls + '" data-persona="' + esc(k) + '">' +
-      esc(pers.nome) + eti + '</button>';
+  const nomeDi = (k) => {
+    const x = persone.find((y) => chiavePersona(y) === k);
+    return x ? x.nome : "?";
+  };
+
+  // "chi ha giocato" si vede solo se in campo siete più di quattro
+  const presentiBox = document.getElementById("risPresentiBox");
+  if (persone.length > 4){
+    presentiBox.style.display = "block";
+    document.getElementById("risNomi").innerHTML = persone.map((pers) => {
+      const k = chiavePersona(pers);
+      const cls = risPresenti.includes(k) ? " scelto" : "";
+      return '<button class="nome-chip' + cls + '" data-persona="' + esc(k) + '">' +
+        esc(pers.nome) + '</button>';
+    }).join("");
+  } else {
+    presentiBox.style.display = "none";
+    risPresenti = persone.map(chiavePersona);
+  }
+
+  const combiBox = document.getElementById("risCombiBox");
+  const cont = document.getElementById("risCombinazioni");
+  const punteggi = document.getElementById("risPunteggi");
+
+  if (risPresenti.length !== 4){
+    combiBox.style.display = "block";
+    cont.innerHTML = '<p class="motivo">' + (persone.length < 4
+      ? "Servono quattro giocatori: qui sotto si scrive chi ha giocato senza l'app."
+      : "Tocca i quattro che hanno giocato questo set.") + '</p>';
+    punteggi.style.display = "none";
+    return;
+  }
+
+  // le tre combinazioni, quella del set precedente per prima
+  const ultimo = (p.set || [])[(p.set || []).length - 1];
+  const precedente = ultimo
+    ? { uno: ultimo.uno.map(chiavePersona), due: ultimo.due.map(chiavePersona) }
+    : null;
+  const combi = combinazioniDi(risPresenti);
+  combi.sort((a, b) =>
+    (stesseCoppie(b, precedente) ? 1 : 0) - (stesseCoppie(a, precedente) ? 1 : 0));
+
+  combiBox.style.display = "block";
+  cont.dataset.combi = JSON.stringify(combi);
+  cont.innerHTML = combi.map((c, i) => {
+    const scelta = stesseCoppie(c, risCoppie) ? " scelta" : "";
+    const eti = stesseCoppie(c, precedente)
+      ? '<span class="eti">come il set prima</span>' : "";
+    return '<button class="combi' + scelta + '" data-combi="' + i + '">' +
+      '<b>' + esc(nomeDi(c.uno[0])) + ' + ' + esc(nomeDi(c.uno[1])) + '</b>' +
+      '<span class="contro"> contro </span>' +
+      '<b>' + esc(nomeDi(c.due[0])) + ' + ' + esc(nomeDi(c.due[1])) + '</b>' +
+      eti + '</button>';
   }).join("");
 
-  const uno = persone.filter((x) => risSelezione[chiavePersona(x)] === 1);
-  const due = persone.filter((x) => risSelezione[chiavePersona(x)] === 2);
-  document.getElementById("risNomiUno").textContent =
-    uno.length ? uno.map((x) => x.nome).join(" + ") : "Coppia 1";
-  document.getElementById("risNomiDue").textContent =
-    due.length ? due.map((x) => x.nome).join(" + ") : "Coppia 2";
+  // i punteggi compaiono quando si sa di chi sono
+  if (!risCoppie){ punteggi.style.display = "none"; return; }
+  punteggi.style.display = "block";
+  document.getElementById("risNomiUno").textContent = risCoppie.uno.map(nomeDi).join(" + ");
+  document.getElementById("risNomiDue").textContent = risCoppie.due.map(nomeDi).join(" + ");
 }
 
 function aggiornaRisultatoSeAperto(){
@@ -1210,11 +1303,19 @@ document.getElementById("risNomi").addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-persona]");
   if (!b) return;
   const k = b.getAttribute("data-persona");
-  // tre stati in ciclo: coppia 1 → coppia 2 → fuori dal set
-  const ora = risSelezione[k];
-  if (ora === 1) risSelezione[k] = 2;
-  else if (ora === 2) delete risSelezione[k];
-  else risSelezione[k] = 1;
+  if (risPresenti.includes(k)) risPresenti = risPresenti.filter((x) => x !== k);
+  else if (risPresenti.length < 4) risPresenti.push(k);
+  else return;                       // in campo sono quattro: prima se ne toglie uno
+  risCoppie = null;                  // cambiata la gente, le coppie si rifanno
+  const p = trovaPartita(risultatoId);
+  if (p) renderFormRisultato(p);
+});
+
+document.getElementById("risCombinazioni").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-combi]");
+  if (!b) return;
+  const combi = JSON.parse(ev.currentTarget.dataset.combi || "[]");
+  risCoppie = combi[Number(b.getAttribute("data-combi"))] || null;
   const p = trovaPartita(risultatoId);
   if (p) renderFormRisultato(p);
 });
@@ -1244,9 +1345,10 @@ document.getElementById("risSetScritti").addEventListener("click", async (ev) =>
     const s = (p.set || [])[Number(iCor)];
     if (!s) return;
     risInModifica = Number(iCor);
-    risSelezione = {};
-    s.uno.forEach((x) => { risSelezione[chiavePersona(x)] = 1; });
-    s.due.forEach((x) => { risSelezione[chiavePersona(x)] = 2; });
+    const uno = s.uno.map(chiavePersona);
+    const due = s.due.map(chiavePersona);
+    risPresenti = uno.concat(due);
+    risCoppie = { uno: uno, due: due };
     document.getElementById("risPuntiUno").value = s.puntiUno;
     document.getElementById("risPuntiDue").value = s.puntiDue;
     renderRisultato();
@@ -1305,10 +1407,12 @@ document.getElementById("risSalvaSet").addEventListener("click", async (ev) => {
   if (!p) return;
   mostraErroreRis("");
   const persone = personePartita(p);
-  const uno = persone.filter((x) => risSelezione[chiavePersona(x)] === 1);
-  const due = persone.filter((x) => risSelezione[chiavePersona(x)] === 2);
-  if (uno.length !== 2 || due.length !== 2)
-    return mostraErroreRis("Servono due nomi per coppia: tocca i nomi finché non sono due e due.");
+  if (!risCoppie) return mostraErroreRis("Tocca la riga con le coppie che erano in campo.");
+  const daChiave = (k) => persone.find((y) => chiavePersona(y) === k);
+  const uno = risCoppie.uno.map(daChiave);
+  const due = risCoppie.due.map(daChiave);
+  if (uno.concat(due).some((x) => !x))
+    return mostraErroreRis("Qualcosa non torna nei nomi: riscegli le coppie.");
 
   const pu = document.getElementById("risPuntiUno").value.trim();
   const pd = document.getElementById("risPuntiDue").value.trim();
