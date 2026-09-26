@@ -404,7 +404,7 @@
           </div>
 
           <div id="risErrore" class="error-box" style="display:none; margin-top:10px;"></div>
-          <p class="field-hint">Le correzioni restano aperte fino a mezzanotte.</p>
+          <p class="field-hint">Puoi aggiungere quanti set vuoi e correggerli fino a una settimana dopo la partita.</p>
         </div>
 
         <div id="risChiuso" class="box-chiuso" style="display:none"></div>
@@ -1012,7 +1012,9 @@ function daScrivere(p){
   const t = new Date(p.quando).getTime();
   if (isNaN(t)) return false;
   const ora = Date.now();
-  return t <= ora && t > ora - 7 * 24 * 60 * 60 * 1000;
+  // da un'ora prima dell'orario: i set si scrivono a bordo campo mentre si
+  // gioca, non il giorno dopo a memoria
+  return t - 60 * 60 * 1000 <= ora && t > ora - 7 * 24 * 60 * 60 * 1000;
 }
 
 function renderPartite(){
@@ -1047,7 +1049,7 @@ function renderDaChiudere(){
     .filter(daScrivere)
     .sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
   if (!viste.length){ cont.innerHTML = ""; return; }
-  cont.innerHTML = '<p class="sezione-titolo">Hai giocato</p>' +
+  cont.innerHTML = '<p class="sezione-titolo">Partite da scrivere</p>' +
     viste.map(cardDaChiudere).join("");
 }
 
@@ -1094,20 +1096,12 @@ function personePartita(p){
   return reg.concat(osp);
 }
 
-function mezzanotteDopo(quando){
-  const d = new Date(quando);
-  if (isNaN(d.getTime())) return Infinity;
-  d.setHours(24, 0, 0, 0);
-  return d.getTime();
-}
-
-// Fino a mezzanotte si scrive e si corregge. Se però non ha scritto nessuno,
-// la partita resta aperta una settimana: meglio un punteggio in ritardo che
-// una serata persa.
+// Si scrive e si corregge per tutta la settimana dopo la partita. La chiusura
+// a mezzanotte, decisa il 17/09, serve a congelare il calcolo dei livelli:
+// finché i livelli non si muovono, chiudere serve solo a perdere dati. Torna
+// insieme al motore.
 function risultatoScrivibile(p){
-  const ora = Date.now();
-  if (ora < mezzanotteDopo(p.quando)) return true;
-  return !(p.set || []).length && daScrivere(p);
+  return daScrivere(p);
 }
 
 function nomiLato(set, lato){
@@ -1174,7 +1168,7 @@ function renderFormRisultato(p){
     form.style.display = "none";
     document.getElementById("risSalvaSet").style.display = "none";
     chiuso.style.display = "block";
-    chiuso.textContent = "Questa partita è chiusa: le correzioni restavano aperte fino a mezzanotte.";
+    chiuso.textContent = "Questa partita è passata da più di una settimana: il risultato non si scrive più.";
     return;
   }
   form.style.display = "block";
